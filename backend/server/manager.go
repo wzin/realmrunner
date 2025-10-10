@@ -133,11 +133,29 @@ func (m *Manager) StartServer(id string) error {
 	m.processes[id] = process
 	m.mu.Unlock()
 
+	// Monitor process in background and update status if it dies
+	go m.monitorProcess(id, process)
+
 	// Update status to running
 	UpdateServerStatus(m.db, id, StatusRunning)
 	UpdateServerLastStarted(m.db, id, time.Now())
 
 	return nil
+}
+
+func (m *Manager) monitorProcess(id string, process *Process) {
+	// Wait for process to exit
+	if process.cmd != nil && process.cmd.Process != nil {
+		process.cmd.Wait()
+
+		// Process exited - update status
+		m.mu.Lock()
+		delete(m.processes, id)
+		m.mu.Unlock()
+
+		UpdateServerStatus(m.db, id, StatusStopped)
+		log.Printf("Server %s process exited, status set to stopped", id)
+	}
 }
 
 func (m *Manager) StopServer(id string) error {
@@ -146,7 +164,7 @@ func (m *Manager) StopServer(id string) error {
 		return err
 	}
 
-	if server.Status != StatusRunning {
+	if server.Status != StatusRunning && server.Status != StatusStarting {
 		return fmt.Errorf("server is not running")
 	}
 
