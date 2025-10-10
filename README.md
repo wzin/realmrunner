@@ -75,7 +75,9 @@ docker compose up -d
 
 This uses Docker (no local dependencies needed) and outputs:
 - The bcrypt hash
-- The exact line to add to `docker-compose.yml`
+- The exact line to add to `docker-compose.yml` with proper escaping
+
+**Important:** The script automatically escapes `$` signs as `$$` for docker-compose.yml. This is required because docker-compose treats `$` as variable substitution.
 
 **Manual methods:**
 
