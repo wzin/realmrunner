@@ -10,21 +10,18 @@ COPY frontend/ ./
 RUN npm run build
 
 # Stage 2: Build backend
-FROM golang:1.21-alpine AS backend-builder
+FROM golang:1.21 AS backend-builder
 
 WORKDIR /app/backend
 
-# Install build dependencies
-RUN apk add --no-cache gcc musl-dev
-
 COPY backend/go.mod ./
-RUN go mod download
 
 COPY backend/ ./
+RUN go mod download && go mod tidy
 RUN CGO_ENABLED=1 GOOS=linux go build -o realmrunner .
 
 # Stage 3: Runtime
-FROM openjdk:17-slim
+FROM eclipse-temurin:17-jre
 
 WORKDIR /app
 
