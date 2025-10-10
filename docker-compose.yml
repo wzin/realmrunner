@@ -1,0 +1,29 @@
+version: '3.8'
+
+services:
+  realmrunner:
+    build: .
+    image: realmrunner:latest
+    container_name: realmrunner
+    restart: unless-stopped
+    ports:
+      - "8080:8080"              # Web UI
+      - "25565-25600:25565-25600" # Minecraft servers
+    volumes:
+      - ./data:/data
+    environment:
+      # REQUIRED: Set your password hash
+      # Generate with: echo -n "yourpassword" | bcrypt-tool
+      REALMRUNNER_PASSWORD_HASH: "$$2a$$10$$N9qo8uLOickgx2ZMRZoMyeIjZAgcfl7p92ldGxad68LJZdL17lhWy"  # password: changeme
+
+      # Optional: Maximum number of running servers
+      REALMRUNNER_MAX_RUNNING: "3"
+
+      # Optional: Port range for Minecraft servers
+      REALMRUNNER_PORT_RANGE: "25565-25600"
+
+      # Optional: Memory allocation per server (MB)
+      REALMRUNNER_MEMORY_MB: "2048"
+
+      # Optional: JWT secret for token signing
+      REALMRUNNER_JWT_SECRET: "change-me-in-production"
