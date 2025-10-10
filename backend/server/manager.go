@@ -20,10 +20,26 @@ type Manager struct {
 }
 
 func NewManager(db *sql.DB, cfg *config.Config) *Manager {
-	return &Manager{
+	m := &Manager{
 		db:        db,
 		config:    cfg,
 		processes: make(map[string]*Process),
+	}
+
+	// Clean up orphaned server statuses on startup
+	m.cleanupOrphanedStatuses()
+
+	return m
+}
+
+func (m *Manager) cleanupOrphanedStatuses() {
+	// Reset all running/starting/stopping servers to stopped on startup
+	// since processes don't survive container restarts
+	query := `UPDATE servers SET status = ? WHERE status IN (?, ?, ?)`
+	_, err := m.db.Exec(query, StatusStopped, StatusRunning, StatusStarting, StatusStopping)
+	if err != nil {
+		// Log but don't fail
+		fmt.Printf("Failed to cleanup orphaned statuses: %v\n", err)
 	}
 }
 
