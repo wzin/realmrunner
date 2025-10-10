@@ -17,7 +17,7 @@ WORKDIR /app/backend
 # Install build dependencies
 RUN apk add --no-cache gcc musl-dev
 
-COPY backend/go.mod backend/go.sum ./
+COPY backend/go.mod ./
 RUN go mod download
 
 COPY backend/ ./

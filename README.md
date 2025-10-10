@@ -46,7 +46,7 @@ services:
 3. Start the container:
 
 ```bash
-docker-compose up -d
+docker compose up -d
 ```
 
 4. Open your browser to `http://localhost:8080`
@@ -205,7 +205,7 @@ cd realmrunner
 docker build -t realmrunner:latest .
 
 # Run
-docker-compose up -d
+docker compose up -d
 ```
 
 ## Development

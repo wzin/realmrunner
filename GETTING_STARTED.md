@@ -21,13 +21,13 @@ Replace the `REALMRUNNER_PASSWORD_HASH` value in `docker-compose.yml` with your 
 
 ```bash
 # Build the Docker image
-docker-compose build
+docker compose build
 
 # Start the container
-docker-compose up -d
+docker compose up -d
 
 # View logs
-docker-compose logs -f
+docker compose logs -f
 ```
 
 ### 4. Access the Application
@@ -146,7 +146,7 @@ realmrunner/
 
 - Check `REALMRUNNER_PASSWORD_HASH` is set
 - Verify data directory exists and is writable
-- Check logs: `docker-compose logs realmrunner`
+- Check logs: `docker compose logs realmrunner`
 
 ### Frontend build fails
 

@@ -326,7 +326,6 @@ FROM openjdk:17-slim
 
 ### Docker Compose Example
 ```yaml
-version: '3.8'
 services:
   realmrunner:
     image: realmrunner:latest
