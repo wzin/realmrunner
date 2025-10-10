@@ -67,24 +67,26 @@ docker compose up -d
 
 ### Generating a Password Hash
 
-Use this Go snippet to generate a bcrypt hash:
+**Using the included script (recommended):**
 
-```go
-package main
-
-import (
-    "fmt"
-    "golang.org/x/crypto/bcrypt"
-)
-
-func main() {
-    password := []byte("your-password-here")
-    hash, _ := bcrypt.GenerateFromPassword(password, bcrypt.DefaultCost)
-    fmt.Println(string(hash))
-}
+```bash
+./generate-password.sh yourpassword
 ```
 
-Or use an online bcrypt generator (ensure you trust the site).
+This uses Docker (no local dependencies needed) and outputs:
+- The bcrypt hash
+- The exact line to add to `docker-compose.yml`
+
+**Manual methods:**
+
+```bash
+# Using Docker with Python
+docker run --rm python:3.11-slim sh -c \
+  "pip install -q bcrypt && python -c 'import bcrypt; print(bcrypt.hashpw(b\"yourpassword\", bcrypt.gensalt()).decode())'"
+
+# Using online tool (less secure for production)
+# Visit: https://bcrypt-generator.com/ (set cost to 10)
+```
 
 ## Usage
 
