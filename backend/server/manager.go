@@ -3,6 +3,7 @@ package server
 import (
 	"database/sql"
 	"fmt"
+	"log"
 	"os"
 	"path/filepath"
 	"sync"
@@ -36,10 +37,15 @@ func (m *Manager) cleanupOrphanedStatuses() {
 	// Reset all running/starting/stopping servers to stopped on startup
 	// since processes don't survive container restarts
 	query := `UPDATE servers SET status = ? WHERE status IN (?, ?, ?)`
-	_, err := m.db.Exec(query, StatusStopped, StatusRunning, StatusStarting, StatusStopping)
+	result, err := m.db.Exec(query, StatusStopped, StatusRunning, StatusStarting, StatusStopping)
 	if err != nil {
-		// Log but don't fail
-		fmt.Printf("Failed to cleanup orphaned statuses: %v\n", err)
+		log.Printf("Failed to cleanup orphaned statuses: %v\n", err)
+		return
+	}
+
+	rows, _ := result.RowsAffected()
+	if rows > 0 {
+		log.Printf("Reset %d orphaned server(s) to stopped status\n", rows)
 	}
 }
 
