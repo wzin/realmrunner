@@ -4,6 +4,7 @@ import (
 	"bufio"
 	"fmt"
 	"io"
+	"log"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -157,32 +158,55 @@ func (p *Process) captureOutput(serverDir string) {
 func (p *Process) TailLogs(serverDir string) (<-chan string, error) {
 	logPath := filepath.Join(serverDir, "logs", "latest.log")
 
-	// Check if log file exists
-	if _, err := os.Stat(logPath); os.IsNotExist(err) {
-		return nil, fmt.Errorf("log file not found")
-	}
-
 	ch := make(chan string, 100)
 
 	go func() {
 		defer close(ch)
 
+		// Wait for log file to exist
+		for i := 0; i < 30; i++ {
+			if _, err := os.Stat(logPath); err == nil {
+				break
+			}
+			time.Sleep(100 * time.Millisecond)
+		}
+
 		file, err := os.Open(logPath)
 		if err != nil {
+			log.Printf("Failed to open log file: %v", err)
 			return
 		}
 		defer file.Close()
 
-		// Seek to end
-		file.Seek(0, io.SeekEnd)
-
+		// Read from beginning (not end)
 		scanner := bufio.NewScanner(file)
+
+		// Send existing lines
+		for scanner.Scan() {
+			ch <- scanner.Text()
+		}
+
+		// Now tail new lines
 		for {
 			if scanner.Scan() {
 				ch <- scanner.Text()
 			} else {
-				// Wait a bit before checking again
+				// Check if there's new content
 				time.Sleep(100 * time.Millisecond)
+
+				// Re-check file for new content
+				newFile, err := os.Open(logPath)
+				if err != nil {
+					return
+				}
+
+				// Seek to where we were
+				currentPos, _ := file.Seek(0, io.SeekCurrent)
+				newFile.Seek(currentPos, io.SeekStart)
+
+				file.Close()
+				file = newFile
+				scanner = bufio.NewScanner(file)
 			}
 		}
 	}()
