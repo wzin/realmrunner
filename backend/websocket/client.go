@@ -32,6 +32,7 @@ type Client struct {
 	send     chan []byte
 	serverID string
 	manager  *server.Manager
+	done     chan struct{}
 }
 
 type WSMessage struct {
@@ -54,6 +55,7 @@ func HandleConnection(w http.ResponseWriter, r *http.Request, hub *Hub, manager 
 		send:     make(chan []byte, 256),
 		serverID: serverID,
 		manager:  manager,
+		done:     make(chan struct{}),
 	}
 
 	client.hub.register <- client
@@ -65,6 +67,7 @@ func HandleConnection(w http.ResponseWriter, r *http.Request, hub *Hub, manager 
 
 func (c *Client) readPump() {
 	defer func() {
+		close(c.done) // Signal all goroutines to stop
 		c.hub.unregister <- c
 		c.conn.Close()
 	}()
@@ -148,12 +151,22 @@ func (c *Client) tailLogs() {
 			return
 		}
 
-		for line := range logChan {
-			c.sendMessage(WSMessage{
-				Type:      "log",
-				Message:   line,
-				Timestamp: time.Now().Format(time.RFC3339),
-			})
+		for {
+			select {
+			case <-c.done:
+				// Client disconnected, stop tailing
+				return
+			case line, ok := <-logChan:
+				if !ok {
+					// Log channel closed
+					return
+				}
+				c.sendMessage(WSMessage{
+					Type:      "log",
+					Message:   line,
+					Timestamp: time.Now().Format(time.RFC3339),
+				})
+			}
 		}
 	}
 }
@@ -164,6 +177,13 @@ func (c *Client) sendMessage(msg WSMessage) {
 		log.Printf("Failed to marshal message: %v", err)
 		return
 	}
+
+	// Safely send without panicking if channel is closed
+	defer func() {
+		if r := recover(); r != nil {
+			log.Printf("Recovered from panic in sendMessage: %v", r)
+		}
+	}()
 
 	select {
 	case c.send <- data:
