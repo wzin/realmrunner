@@ -73,11 +73,17 @@ docker compose up -d
 ./generate-password.sh yourpassword
 ```
 
-This uses Docker (no local dependencies needed) and outputs:
-- The bcrypt hash
-- The exact line to add to `docker-compose.yml` with proper escaping
+This outputs the password hash ready to paste into docker-compose.yml:
+```
+$$2b$$12$$fCVYd0CY9GgtKyW17AyIzO2Qqbb8eONp3e0Izhl1T8yZqsnxwZGcm
+```
 
-**Important:** The script automatically escapes `$` signs as `$$` for docker-compose.yml. This is required because docker-compose treats `$` as variable substitution.
+Then update docker-compose.yml:
+```yaml
+REALMRUNNER_PASSWORD_HASH: "$$2b$$12$$fCVYd0CY9GgtKyW17AyIzO2Qqbb8eONp3e0Izhl1T8yZqsnxwZGcm"
+```
+
+**Note:** The `$$` is required for docker-compose.yml (escapes `$` signs).
 
 **Manual methods:**
 

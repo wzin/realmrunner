@@ -12,8 +12,7 @@ services:
     environment:
       # REQUIRED: Set your password hash
       # Generate with: ./generate-password.sh yourpassword
-      REALMRUNNER_PASSWORD_HASH: "12b1121ZGK8NOxqVVvZGCO63LVJz.BJ2oxtCkGL/xg6B/FQseyOgRb/mKXe."
-
+      REALMRUNNER_PASSWORD_HASH: "$2b$12$ZGK8NOxqVVvZGCO63LVJz.BJ2oxtCkGL/xg6B/FQseyOgRb/mKXe."
       # Optional: Maximum number of running servers
       REALMRUNNER_MAX_RUNNING: "3"
 
