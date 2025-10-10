@@ -34,19 +34,19 @@ func NewManager(db *sql.DB, cfg *config.Config) *Manager {
 }
 
 func (m *Manager) cleanupOrphanedStatuses() {
+	log.Println("Running startup cleanup for orphaned server statuses...")
+
 	// Reset all running/starting/stopping servers to stopped on startup
 	// since processes don't survive container restarts
 	query := `UPDATE servers SET status = ? WHERE status IN (?, ?, ?)`
 	result, err := m.db.Exec(query, StatusStopped, StatusRunning, StatusStarting, StatusStopping)
 	if err != nil {
-		log.Printf("Failed to cleanup orphaned statuses: %v\n", err)
+		log.Printf("ERROR: Failed to cleanup orphaned statuses: %v\n", err)
 		return
 	}
 
 	rows, _ := result.RowsAffected()
-	if rows > 0 {
-		log.Printf("Reset %d orphaned server(s) to stopped status\n", rows)
-	}
+	log.Printf("Startup cleanup: Reset %d orphaned server(s) to stopped status\n", rows)
 }
 
 func (m *Manager) CreateServer(name, version string, port int) (*Server, error) {
