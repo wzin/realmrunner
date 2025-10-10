@@ -19,15 +19,30 @@ A web-based Minecraft Java Edition server manager packaged as a Docker container
 - Docker and Docker Compose installed
 - Ports available for web UI (default: 8080) and Minecraft servers (default: 25565-25600)
 
+### Using Pre-built Image from GitHub Container Registry
+
+The easiest way to run RealmRunner is using the pre-built image:
+
+```bash
+# Pull the latest image
+docker pull ghcr.io/wzin/realmrunner:main
+
+# Or use in docker-compose.yml
+```
+
+See the docker-compose.yml example below.
+
 ### Running with Docker Compose
 
 1. Create a `docker-compose.yml` file:
 
 ```yaml
-version: '3.8'
 services:
   realmrunner:
-    image: realmrunner:latest
+    # Use pre-built image from GitHub Container Registry
+    image: ghcr.io/wzin/realmrunner:main
+    # Or build locally:
+    # build: .
     ports:
       - "8080:8080"                    # Web UI
       - "25565-25600:25565-25600"      # Minecraft servers
@@ -41,7 +56,12 @@ services:
     restart: unless-stopped
 ```
 
-2. Generate a password hash (see Configuration section below)
+2. Generate a password hash:
+
+```bash
+./generate-password.sh yourpassword
+# Copy the output and paste into docker-compose.yml
+```
 
 3. Start the container:
 
@@ -206,6 +226,8 @@ Mount a host directory to `/data` to persist servers across container restarts.
 
 ## Building from Source
 
+If you want to build locally instead of using the pre-built image:
+
 ```bash
 # Clone repository
 git clone git@github.com:wzin/realmrunner.git
@@ -213,6 +235,10 @@ cd realmrunner
 
 # Build Docker image
 docker build -t realmrunner:latest .
+
+# Update docker-compose.yml to use local image:
+# image: realmrunner:latest
+# build: .
 
 # Run
 docker compose up -d
