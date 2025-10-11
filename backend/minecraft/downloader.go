@@ -23,8 +23,11 @@ func DownloadServer(dataDir, serverID, version string) error {
 
 	// Check if already exists
 	if _, err := os.Stat(jarPath); err == nil {
+		fmt.Printf("Server JAR for version %s already exists (cached), skipping download\n", version)
 		return nil // Already downloaded
 	}
+
+	fmt.Printf("Downloading Minecraft server version %s...\n", version)
 
 	// Download server.jar
 	resp, err := http.Get(downloadURL)
@@ -45,9 +48,12 @@ func DownloadServer(dataDir, serverID, version string) error {
 	defer file.Close()
 
 	// Copy content
-	if _, err := io.Copy(file, resp.Body); err != nil {
+	bytesWritten, err := io.Copy(file, resp.Body)
+	if err != nil {
 		return fmt.Errorf("failed to write file: %w", err)
 	}
+
+	fmt.Printf("Successfully downloaded Minecraft server version %s (%.2f MB)\n", version, float64(bytesWritten)/(1024*1024))
 
 	return nil
 }

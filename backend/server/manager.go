@@ -196,6 +196,33 @@ func (m *Manager) StopServer(id string) error {
 	return nil
 }
 
+func (m *Manager) ResetServer(id string) error {
+	server, err := GetServer(m.db, id)
+	if err != nil {
+		return err
+	}
+
+	if server.Status == StatusRunning {
+		return fmt.Errorf("cannot reset a running server, stop it first")
+	}
+
+	// Delete world directories
+	serverDir := m.getServerDir(id)
+	worldDirs := []string{"world", "world_nether", "world_the_end"}
+
+	for _, worldDir := range worldDirs {
+		worldPath := filepath.Join(serverDir, worldDir)
+		if _, err := os.Stat(worldPath); err == nil {
+			if err := os.RemoveAll(worldPath); err != nil {
+				return fmt.Errorf("failed to delete %s: %w", worldDir, err)
+			}
+			log.Printf("Deleted %s for server %s", worldDir, id)
+		}
+	}
+
+	return nil
+}
+
 func (m *Manager) WipeoutServer(id string) error {
 	server, err := GetServer(m.db, id)
 	if err != nil {
@@ -241,4 +268,8 @@ func (m *Manager) GetProcess(id string) (*Process, bool) {
 
 func (m *Manager) getServerDir(id string) string {
 	return filepath.Join(m.config.DataDir, "servers", id)
+}
+
+func (m *Manager) GetServerDir(id string) string {
+	return m.getServerDir(id)
 }

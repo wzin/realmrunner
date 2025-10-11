@@ -60,11 +60,28 @@
 
       <button
         v-if="server.status === 'stopped'"
-        @click="handleWipeout"
+        @click="$emit('console', server)"
+        class="btn btn-secondary btn-sm"
+      >
+        View Logs
+      </button>
+
+      <button
+        v-if="server.status === 'stopped'"
+        @click="handleReset"
+        class="btn btn-warning btn-sm"
+        :disabled="loading"
+      >
+        Reset
+      </button>
+
+      <button
+        v-if="server.status === 'stopped'"
+        @click="handleDelete"
         class="btn btn-danger btn-sm"
         :disabled="loading"
       >
-        Wipeout
+        Delete
       </button>
     </div>
   </div>
@@ -114,8 +131,26 @@ async function handleStop() {
   }
 }
 
-async function handleWipeout() {
-  if (!confirm(`Are you sure you want to wipeout "${props.server.name}"? This will permanently delete all server data!`)) {
+async function handleReset() {
+  if (!confirm(`Are you sure you want to reset "${props.server.name}"? This will delete the world directory and start fresh.`)) {
+    return
+  }
+
+  loading.value = true
+  error.value = ''
+
+  try {
+    await api.resetServer(props.server.id)
+    emit('refresh')
+  } catch (err) {
+    error.value = err.message || 'Failed to reset server'
+  } finally {
+    loading.value = false
+  }
+}
+
+async function handleDelete() {
+  if (!confirm(`Are you sure you want to delete "${props.server.name}"? This will permanently delete all server data!`)) {
     return
   }
 
@@ -126,7 +161,7 @@ async function handleWipeout() {
     await api.wipeoutServer(props.server.id)
     emit('refresh')
   } catch (err) {
-    error.value = err.message || 'Failed to wipeout server'
+    error.value = err.message || 'Failed to delete server'
   } finally {
     loading.value = false
   }

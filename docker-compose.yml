@@ -1,10 +1,10 @@
 services:
   realmrunner:
     # Use pre-built image from GitHub Container Registry
-    image: ghcr.io/wzin/realmrunner:main
+    # image: ghcr.io/wzin/realmrunner:main
     # Or build locally:
-    # build: .
-    # image: realmrunner:latest
+    build: .
+    image: realmrunner:latest
     container_name: realmrunner
     restart: unless-stopped
     ports:

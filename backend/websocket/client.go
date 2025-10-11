@@ -4,7 +4,6 @@ import (
 	"encoding/json"
 	"log"
 	"net/http"
-	"path/filepath"
 	"time"
 
 	"github.com/gorilla/websocket"
@@ -137,14 +136,15 @@ func (c *Client) tailLogs() {
 		Status: srv.Status,
 	})
 
-	// If server is running, tail logs
+	serverDir := c.manager.GetServerDir(c.serverID)
+
+	// If server is running, tail logs in real-time
 	if srv.Status == server.StatusRunning {
 		process, exists := c.manager.GetProcess(c.serverID)
 		if !exists {
 			return
 		}
 
-		serverDir := filepath.Join("/data", "servers", c.serverID)
 		logChan, err := process.TailLogs(serverDir)
 		if err != nil {
 			log.Printf("Failed to tail logs: %v", err)
@@ -161,6 +161,28 @@ func (c *Client) tailLogs() {
 					// Log channel closed
 					return
 				}
+				c.sendMessage(WSMessage{
+					Type:      "log",
+					Message:   line,
+					Timestamp: time.Now().Format(time.RFC3339),
+				})
+			}
+		}
+	} else {
+		// Server is stopped, send historical logs
+		logs, err := server.ReadHistoricalLogs(serverDir)
+		if err != nil {
+			log.Printf("Failed to read historical logs: %v", err)
+			return
+		}
+
+		// Send all historical logs
+		for _, line := range logs {
+			select {
+			case <-c.done:
+				// Client disconnected, stop sending
+				return
+			default:
 				c.sendMessage(WSMessage{
 					Type:      "log",
 					Message:   line,

@@ -213,3 +213,37 @@ func (p *Process) TailLogs(serverDir string) (<-chan string, error) {
 
 	return ch, nil
 }
+
+// ReadHistoricalLogs reads logs from the log file (for stopped servers)
+// Returns up to the last 10,000 lines to avoid overwhelming the browser
+func ReadHistoricalLogs(serverDir string) ([]string, error) {
+	logPath := filepath.Join(serverDir, "logs", "latest.log")
+
+	// Check if log file exists
+	if _, err := os.Stat(logPath); os.IsNotExist(err) {
+		return []string{}, nil // No logs yet
+	}
+
+	file, err := os.Open(logPath)
+	if err != nil {
+		return nil, fmt.Errorf("failed to open log file: %w", err)
+	}
+	defer file.Close()
+
+	var lines []string
+	scanner := bufio.NewScanner(file)
+	for scanner.Scan() {
+		lines = append(lines, scanner.Text())
+
+		// Keep only the last 10,000 lines to avoid memory issues
+		if len(lines) > 10000 {
+			lines = lines[1:]
+		}
+	}
+
+	if err := scanner.Err(); err != nil {
+		return nil, fmt.Errorf("error reading log file: %w", err)
+	}
+
+	return lines, nil
+}

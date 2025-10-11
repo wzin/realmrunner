@@ -32,6 +32,7 @@ func RegisterRoutes(
 	protected.GET("/servers/:id", handlers.GetServer)
 	protected.POST("/servers/:id/start", handlers.StartServer)
 	protected.POST("/servers/:id/stop", handlers.StopServer)
+	protected.POST("/servers/:id/reset", handlers.ResetServer)
 	protected.DELETE("/servers/:id/wipeout", handlers.WipeoutServer)
 	protected.POST("/servers/:id/command", handlers.SendCommand)
 

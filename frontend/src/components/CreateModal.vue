@@ -44,13 +44,15 @@
             v-model.number="form.port"
             type="number"
             class="input"
+            :class="{ 'input-error': portError }"
             placeholder="25565"
             required
             min="1"
             max="65535"
             :disabled="loading"
           />
-          <p class="help-text">Default Minecraft port is 25565</p>
+          <p v-if="portError" class="error-text">{{ portError }}</p>
+          <p v-else class="help-text">Default Minecraft port is 25565. Occupied ports: {{ occupiedPorts.join(', ') || 'None' }}</p>
         </div>
 
         <div class="modal-actions">
@@ -65,7 +67,7 @@
           <button
             type="submit"
             class="btn btn-primary"
-            :disabled="loading || loadingVersions"
+            :disabled="loading || loadingVersions || !!portError"
           >
             {{ loading ? 'Creating...' : 'Create Server' }}
           </button>
@@ -76,7 +78,7 @@
 </template>
 
 <script setup>
-import { ref, onMounted } from 'vue'
+import { ref, onMounted, computed } from 'vue'
 import { api } from '../api/client'
 
 const emit = defineEmits(['close', 'created'])
@@ -84,13 +86,36 @@ const emit = defineEmits(['close', 'created'])
 const form = ref({
   name: '',
   version: '',
-  port: 25565
+  port: null
 })
 
 const versions = ref([])
+const servers = ref([])
 const loading = ref(false)
 const loadingVersions = ref(false)
 const error = ref('')
+
+const occupiedPorts = computed(() => {
+  return servers.value.map(s => s.port).sort((a, b) => a - b)
+})
+
+const portError = computed(() => {
+  const port = form.value.port
+
+  if (!port) {
+    return ''
+  }
+
+  if (port < 1 || port > 65535) {
+    return 'Port must be between 1 and 65535'
+  }
+
+  if (occupiedPorts.value.includes(port)) {
+    return `Port ${port} is already in use by another server`
+  }
+
+  return ''
+})
 
 async function loadVersions() {
   loadingVersions.value = true
@@ -104,7 +129,20 @@ async function loadVersions() {
   }
 }
 
+async function loadServers() {
+  try {
+    servers.value = await api.getServers()
+  } catch (err) {
+    console.error('Failed to load servers:', err)
+  }
+}
+
 async function handleCreate() {
+  // Check if there's a port error
+  if (portError.value) {
+    return
+  }
+
   loading.value = true
   error.value = ''
 
@@ -120,6 +158,7 @@ async function handleCreate() {
 
 onMounted(() => {
   loadVersions()
+  loadServers()
 })
 </script>
 
@@ -128,6 +167,16 @@ onMounted(() => {
   margin-top: 0.25rem;
   font-size: 0.75rem;
   color: #94a3b8;
+}
+
+.error-text {
+  margin-top: 0.25rem;
+  font-size: 0.75rem;
+  color: #ef4444;
+}
+
+.input-error {
+  border-color: #ef4444;
 }
 
 .modal-actions {

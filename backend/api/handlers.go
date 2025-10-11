@@ -99,6 +99,15 @@ func (h *Handlers) StopServer(c *gin.Context) {
 	c.JSON(http.StatusOK, gin.H{"message": "server stopped"})
 }
 
+func (h *Handlers) ResetServer(c *gin.Context) {
+	id := c.Param("id")
+	if err := h.manager.ResetServer(id); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+	c.JSON(http.StatusOK, gin.H{"message": "server reset"})
+}
+
 func (h *Handlers) WipeoutServer(c *gin.Context) {
 	id := c.Param("id")
 	if err := h.manager.WipeoutServer(id); err != nil {

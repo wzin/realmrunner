@@ -46,6 +46,7 @@ export const api = {
   }),
   startServer: (id) => request(`/servers/${id}/start`, { method: 'POST' }),
   stopServer: (id) => request(`/servers/${id}/stop`, { method: 'POST' }),
+  resetServer: (id) => request(`/servers/${id}/reset`, { method: 'POST' }),
   wipeoutServer: (id) => request(`/servers/${id}/wipeout`, { method: 'DELETE' }),
   sendCommand: (id, command) => request(`/servers/${id}/command`, {
     method: 'POST',

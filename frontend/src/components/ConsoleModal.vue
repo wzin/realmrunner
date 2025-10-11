@@ -9,7 +9,8 @@
       <div class="console-container">
         <div ref="logContainer" class="log-output">
           <div v-if="logs.length === 0" class="empty-logs">
-            Waiting for logs...
+            <span v-if="server.status === 'stopped'">No logs available. Start the server to generate logs.</span>
+            <span v-else>Waiting for logs...</span>
           </div>
           <div
             v-for="(log, index) in logs"
@@ -122,9 +123,9 @@ async function sendCommand() {
 }
 
 onMounted(() => {
-  if (props.server.status === 'running') {
-    connectWebSocket()
-  }
+  // Connect WebSocket for both running and stopped servers
+  // Stopped servers will show historical logs
+  connectWebSocket()
 })
 
 onUnmounted(() => {

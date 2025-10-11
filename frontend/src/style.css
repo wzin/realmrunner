@@ -74,6 +74,15 @@ input, select {
   background: #475569;
 }
 
+.btn-warning {
+  background: #f59e0b;
+  color: #78350f;
+}
+
+.btn-warning:hover {
+  background: #d97706;
+}
+
 .btn:disabled {
   opacity: 0.5;
   cursor: not-allowed;
