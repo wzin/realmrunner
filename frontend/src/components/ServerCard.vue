@@ -16,6 +16,10 @@
         <span class="info-value">{{ server.port }}</span>
       </div>
       <div class="info-item">
+        <span class="info-label">Server Address:</span>
+        <span class="info-value connection-url">{{ server.connection_url || `localhost:${server.port}` }}</span>
+      </div>
+      <div class="info-item">
         <span class="info-label">Created:</span>
         <span class="info-value">{{ formatDate(server.created_at) }}</span>
       </div>
@@ -243,6 +247,11 @@ function formatDate(dateString) {
 
 .info-value {
   font-weight: 500;
+}
+
+.connection-url {
+  font-family: monospace;
+  color: #3b82f6;
 }
 
 .server-actions {

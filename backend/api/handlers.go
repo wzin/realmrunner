@@ -1,6 +1,7 @@
 package api
 
 import (
+	"fmt"
 	"net/http"
 
 	"github.com/gin-gonic/gin"
@@ -36,13 +37,33 @@ type CommandRequest struct {
 	Command string `json:"command" binding:"required"`
 }
 
+type ServerResponse struct {
+	*server.Server
+	ConnectionURL string `json:"connection_url"`
+}
+
+func (h *Handlers) makeServerResponse(srv *server.Server) *ServerResponse {
+	return &ServerResponse{
+		Server:        srv,
+		ConnectionURL: fmt.Sprintf("%s:%d", h.config.BaseURL, srv.Port),
+	}
+}
+
+func (h *Handlers) makeServerResponses(servers []*server.Server) []*ServerResponse {
+	responses := make([]*ServerResponse, len(servers))
+	for i, srv := range servers {
+		responses[i] = h.makeServerResponse(srv)
+	}
+	return responses
+}
+
 func (h *Handlers) ListServers(c *gin.Context) {
 	servers, err := h.manager.GetAllServers()
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
 	}
-	c.JSON(http.StatusOK, servers)
+	c.JSON(http.StatusOK, h.makeServerResponses(servers))
 }
 
 func (h *Handlers) CreateServer(c *gin.Context) {
@@ -68,7 +89,7 @@ func (h *Handlers) CreateServer(c *gin.Context) {
 		}
 	}()
 
-	c.JSON(http.StatusCreated, srv)
+	c.JSON(http.StatusCreated, h.makeServerResponse(srv))
 }
 
 func (h *Handlers) GetServer(c *gin.Context) {
@@ -78,7 +99,7 @@ func (h *Handlers) GetServer(c *gin.Context) {
 		c.JSON(http.StatusNotFound, gin.H{"error": "server not found"})
 		return
 	}
-	c.JSON(http.StatusOK, srv)
+	c.JSON(http.StatusOK, h.makeServerResponse(srv))
 }
 
 func (h *Handlers) StartServer(c *gin.Context) {

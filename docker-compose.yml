@@ -27,3 +27,8 @@ services:
 
       # Optional: JWT secret for token signing
       REALMRUNNER_JWT_SECRET: "change-me-in-production"
+
+      # Optional: Base URL for server connection display
+      # This is the domain/IP that players will use to connect
+      # Examples: "minecraft.example.com", "play.myserver.net", "192.168.1.100"
+      REALMRUNNER_BASE_URL: "minecraft.example.com"

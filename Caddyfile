@@ -1,0 +1,36 @@
+# Dynamic Caddyfile that uses environment variables
+# No editing needed - just set environment variables
+#
+# Required environment variables:
+#   CADDY_DOMAIN - Your domain (e.g., minecraft.example.com)
+#
+# Optional environment variables:
+#   SSL_MODE - Either "letsencrypt" (default) or "custom"
+#   For custom mode, mount your certs to /etc/caddy/certs/
+
+{$CADDY_DOMAIN} {
+    # Automatic HTTPS with Let's Encrypt (default)
+    # Or use custom certificates if SSL_MODE=custom
+    tls {$CADDY_TLS_CERT:} {$CADDY_TLS_KEY:}
+
+    reverse_proxy realmrunner:8080
+
+    # Security headers
+    header {
+        Strict-Transport-Security "max-age=31536000; includeSubDomains"
+        X-Frame-Options "SAMEORIGIN"
+        X-Content-Type-Options "nosniff"
+    }
+
+    # WebSocket support for live logs
+    @websocket {
+        header Connection *Upgrade*
+        header Upgrade websocket
+    }
+    reverse_proxy @websocket realmrunner:8080
+}
+
+# Optional: Redirect www to non-www
+www.{$CADDY_DOMAIN} {
+    redir https://{$CADDY_DOMAIN}{uri}
+}

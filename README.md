@@ -53,6 +53,7 @@ services:
       REALMRUNNER_MAX_RUNNING: 3
       REALMRUNNER_PORT_RANGE: "25565-25600"
       REALMRUNNER_MEMORY_MB: 2048
+      REALMRUNNER_BASE_URL: "minecraft.example.com"  # Your server domain/IP
     restart: unless-stopped
 ```
 
@@ -84,6 +85,7 @@ docker compose up -d
 | `REALMRUNNER_PORT_RANGE` | Port range for Minecraft servers | 25565-25600 | ❌ |
 | `REALMRUNNER_MEMORY_MB` | Memory allocation per server (MB) | 2048 | ❌ |
 | `REALMRUNNER_DATA_DIR` | Data directory path | /data | ❌ |
+| `REALMRUNNER_BASE_URL` | Base URL/domain for server connections (displayed in UI) | localhost | ❌ |
 
 ### Generating a Password Hash
 
@@ -134,7 +136,7 @@ Click the **"Start"** button on a server card. The server will transition throug
 - **Starting**: Server is launching
 - **Running**: Server is online and accepting connections
 
-Connect to your server using the displayed port: `your-server-ip:PORT`
+Connect to your server using the displayed server address (e.g., `minecraft.example.com:25565`)
 
 ### Stopping a Server
 

@@ -1,0 +1,45 @@
+services:
+  realmrunner:
+    image: ${REALMRUNNER_IMAGE:-ghcr.io/wzin/realmrunner:main}
+    container_name: realmrunner
+    restart: unless-stopped
+    # Remove port 8080 from external exposure - only Caddy will access it
+    ports:
+      - "${MINECRAFT_PORT_RANGE:-25565-25600}:${MINECRAFT_PORT_RANGE:-25565-25600}"
+    volumes:
+      - ${DATA_DIR:-./data}:/data
+    networks:
+      - realmrunner-network
+    environment:
+      REALMRUNNER_PASSWORD_HASH: ${REALMRUNNER_PASSWORD_HASH}
+      REALMRUNNER_MAX_RUNNING: ${REALMRUNNER_MAX_RUNNING:-3}
+      REALMRUNNER_PORT_RANGE: ${MINECRAFT_PORT_RANGE:-25565-25600}
+      REALMRUNNER_MEMORY_MB: ${REALMRUNNER_MEMORY_MB:-2048}
+      REALMRUNNER_JWT_SECRET: ${REALMRUNNER_JWT_SECRET:-change-me-in-production}
+      REALMRUNNER_BASE_URL: ${CADDY_DOMAIN}
+
+  # Caddy reverse proxy with automatic HTTPS
+  caddy:
+    image: caddy:2-alpine
+    container_name: caddy
+    restart: unless-stopped
+    ports:
+      - "${HTTP_PORT:-80}:80"
+      - "${HTTPS_PORT:-443}:443"
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      - ${CADDY_DATA_DIR:-./caddy_data}:/data
+      - ${CADDY_CONFIG_DIR:-./caddy_config}:/config
+      # Optional: For custom certificates
+      - ${CERTS_DIR:-./certs}:/etc/caddy/certs:ro
+    networks:
+      - realmrunner-network
+    environment:
+      CADDY_DOMAIN: ${CADDY_DOMAIN}
+      # For custom certificates, set these:
+      CADDY_TLS_CERT: ${CADDY_TLS_CERT:-}
+      CADDY_TLS_KEY: ${CADDY_TLS_KEY:-}
+
+networks:
+  realmrunner-network:
+    driver: bridge

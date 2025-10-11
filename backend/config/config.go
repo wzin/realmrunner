@@ -14,6 +14,7 @@ type Config struct {
 	MemoryMB     int
 	DataDir      string
 	JWTSecret    string
+	BaseURL      string
 }
 
 type PortRange struct {
@@ -72,6 +73,11 @@ func Load() (*Config, error) {
 		jwtSecret = "change-me-in-production" // Default for development
 	}
 
+	baseURL := os.Getenv("REALMRUNNER_BASE_URL")
+	if baseURL == "" {
+		baseURL = "localhost" // Default for development
+	}
+
 	return &Config{
 		PasswordHash: passwordHash,
 		MaxRunning:   maxRunning,
@@ -79,6 +85,7 @@ func Load() (*Config, error) {
 		MemoryMB:     memoryMB,
 		DataDir:      dataDir,
 		JWTSecret:    jwtSecret,
+		BaseURL:      baseURL,
 	}, nil
 }
 
