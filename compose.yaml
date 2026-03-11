@@ -6,6 +6,7 @@ services:
     container_name: realmrunner
     restart: unless-stopped
     ports:
+      - "8080:8080"
       - "25565-25600:25565-25600"
     volumes:
       - ./data:/data

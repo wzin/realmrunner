@@ -1,6 +1,9 @@
 # Data directory
 data/
 
+# Environment files
+.env
+
 # Go
 *.exe
 *.exe~
