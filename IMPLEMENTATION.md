@@ -92,10 +92,12 @@ RealmRunner is a web-based Minecraft Java Edition server manager packaged as a D
 ### Environment Variables
 ```bash
 REALMRUNNER_PASSWORD_HASH=<bcrypt hash>    # Auth password (bcrypt hashed)
+REALMRUNNER_JWT_SECRET=<secret>            # JWT signing secret
 REALMRUNNER_MAX_RUNNING=3                  # Max concurrent running servers
 REALMRUNNER_PORT_RANGE=25565-25600         # Allowed port range for servers
 REALMRUNNER_MEMORY_MB=2048                 # Memory allocation per server
 REALMRUNNER_DATA_DIR=/data                 # Data directory path
+REALMRUNNER_BASE_URL=realmrunner.ziniewicz.eu  # Display domain for connections
 ```
 
 ### Database Schema (SQLite)
@@ -311,35 +313,21 @@ WS     /api/ws/:id                  # Real-time logs and status updates
 
 ### Docker Image
 ```dockerfile
+FROM node:20-alpine AS frontend-builder
+# Build Vue frontend
+
 FROM golang:1.21 AS backend-builder
 # Build Go backend
 
-FROM node:20 AS frontend-builder
-# Build Vue frontend
-
-FROM openjdk:17-slim
-# Install runtime dependencies
+FROM eclipse-temurin:21-jre
+# Install ca-certificates
 # Copy built backend binary
 # Copy built frontend static files
-# Set up entrypoint
 ```
 
-### Docker Compose Example
-```yaml
-services:
-  realmrunner:
-    image: realmrunner:latest
-    ports:
-      - "8080:8080"           # Web UI
-      - "25565-25600:25565-25600"  # Minecraft servers
-    volumes:
-      - ./data:/data
-    environment:
-      REALMRUNNER_PASSWORD_HASH: "$2a$10$..."
-      REALMRUNNER_MAX_RUNNING: 3
-      REALMRUNNER_PORT_RANGE: "25565-25600"
-      REALMRUNNER_MEMORY_MB: 2048
-```
+### Deployment
+
+Deployed via Komodo with SSL terminated by Traefik. See `compose.yaml` for the full configuration. The `traefik_proxy` external Docker network connects the container to Traefik.
 
 ## Decisions Finalized
 1. **Server naming**: User-provided names ✓

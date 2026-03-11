@@ -7,7 +7,8 @@ This document provides context for AI assistants (like Claude) working on the Re
 **Name**: RealmRunner
 **Purpose**: Web-based Minecraft Java Edition server manager
 **Repository**: git@github.com:wzin/realmrunner.git
-**Target Deployment**: Docker container with single volume mount
+**Target Deployment**: Docker container via Komodo, SSL terminated by Traefik
+**Production URL**: https://realmrunner.ziniewicz.eu
 
 ## Architecture Overview
 
@@ -86,7 +87,7 @@ This document provides context for AI assistants (like Claude) working on the Re
 │   ├── package.json
 │   └── vite.config.js
 ├── Dockerfile                   # Multi-stage build
-├── docker-compose.yml           # Example deployment
+├── compose.yaml                 # Docker Compose (Komodo-compatible)
 ├── IMPLEMENTATION.md            # Detailed implementation spec
 ├── README.md                    # User documentation
 └── CLAUDE.md                    # This file
@@ -165,10 +166,12 @@ CREATE TABLE servers (
 
 ```bash
 REALMRUNNER_PASSWORD_HASH=<bcrypt>  # Required
+REALMRUNNER_JWT_SECRET=<secret>     # Required
 REALMRUNNER_MAX_RUNNING=3           # Max concurrent servers
 REALMRUNNER_PORT_RANGE=25565-25600  # Allowed port range
 REALMRUNNER_MEMORY_MB=2048          # Memory per server
 REALMRUNNER_DATA_DIR=/data          # Data directory
+REALMRUNNER_BASE_URL=realmrunner.ziniewicz.eu  # Display domain
 ```
 
 ## Key Algorithms & Logic
@@ -285,25 +288,38 @@ REALMRUNNER_DATA_DIR=/data          # Data directory
 ## Docker Build
 
 Multi-stage Dockerfile:
-1. **Stage 1**: Build Vue frontend (node:20)
+1. **Stage 1**: Build Vue frontend (node:20-alpine)
 2. **Stage 2**: Build Go backend (golang:1.21)
-3. **Stage 3**: Runtime (openjdk:17-slim)
+3. **Stage 3**: Runtime (eclipse-temurin:21-jre)
    - Copy built static files from stage 1
    - Copy Go binary from stage 2
    - Install ca-certificates for HTTPS
    - Expose port 8080
-   - Set ENTRYPOINT to backend binary
+   - Set CMD to backend binary
 
-## Deployment Checklist
+## Deployment
 
-- [ ] Set strong REALMRUNNER_PASSWORD_HASH
+RealmRunner is deployed via **Komodo** which manages the stack from this git repo.
+SSL is terminated by **Traefik** from the homecloud stack (`traefik_proxy` Docker network).
+
+The `compose.yaml` includes:
+- Traefik labels routing `realmrunner.ziniewicz.eu` to container port 8080
+- `traefik_proxy` external network for Traefik connectivity
+- Minecraft ports 25565-25600 exposed directly
+- Build config with `network: host` to work around Docker DNS issues
+- Port 8080 commented out (only needed for local dev)
+
+Environment variables (`REALMRUNNER_PASSWORD_HASH`, `REALMRUNNER_JWT_SECRET`) are set in Komodo's stack configuration. Use unescaped bcrypt hashes in Komodo's UI.
+
+### Deployment Checklist
+
+- [ ] Set strong REALMRUNNER_PASSWORD_HASH in Komodo
+- [ ] Set REALMRUNNER_JWT_SECRET in Komodo
 - [ ] Configure appropriate REALMRUNNER_MAX_RUNNING
 - [ ] Ensure REALMRUNNER_PORT_RANGE matches exposed ports
 - [ ] Mount persistent volume to /data
-- [ ] Use HTTPS reverse proxy (Nginx, Caddy, Traefik)
 - [ ] Set up firewall rules for Minecraft ports
 - [ ] Configure automatic backups of /data volume
-- [ ] Set restart policy (unless-stopped or always)
 - [ ] Monitor disk usage on /data volume
 
 ## Future Enhancements
@@ -356,6 +372,7 @@ Multi-stage Dockerfile:
 ## Version History
 
 - **v0.1.0**: Initial design and specification (2025-10-10)
+- **v0.2.0**: Komodo deployment with Traefik SSL termination (2026-03-11)
 
 ---
 

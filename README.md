@@ -4,75 +4,57 @@ A web-based Minecraft Java Edition server manager packaged as a Docker container
 
 ## Features
 
-- 🎮 **Multiple Servers**: Create and manage multiple Minecraft servers
-- 🔄 **Version Selection**: Choose from official Minecraft Java Edition releases
-- 🎛️ **Server Controls**: Start, stop, and wipeout servers with one click
-- 📊 **Real-time Logs**: View server logs as they happen
-- 💻 **Console Access**: Send commands directly to running servers
-- 🔒 **Password Protected**: Secure access with password authentication
-- 🐳 **Docker Ready**: Single container with all dependencies included
+- **Multiple Servers**: Create and manage multiple Minecraft servers
+- **Version Selection**: Choose from official Minecraft Java Edition releases
+- **Server Controls**: Start, stop, and wipeout servers with one click
+- **Real-time Logs**: View server logs as they happen
+- **Console Access**: Send commands directly to running servers
+- **Password Protected**: Secure access with password authentication
+- **Docker Ready**: Single container with all dependencies included
 
 ## Quick Start
 
 ### Prerequisites
 
 - Docker and Docker Compose installed
-- Ports available for web UI (default: 8080) and Minecraft servers (default: 25565-25600)
-
-### Using Pre-built Image from GitHub Container Registry
-
-The easiest way to run RealmRunner is using the pre-built image:
-
-```bash
-# Pull the latest image
-docker pull ghcr.io/wzin/realmrunner:main
-
-# Or use in docker-compose.yml
-```
-
-See the docker-compose.yml example below.
+- Ports available for Minecraft servers (default: 25565-25600)
 
 ### Running with Docker Compose
 
-1. Create a `docker-compose.yml` file:
+1. Clone the repository:
 
-```yaml
-services:
-  realmrunner:
-    # Use pre-built image from GitHub Container Registry
-    image: ghcr.io/wzin/realmrunner:main
-    # Or build locally:
-    # build: .
-    ports:
-      - "8080:8080"                    # Web UI
-      - "25565-25600:25565-25600"      # Minecraft servers
-    volumes:
-      - ./data:/data                   # Persistent server data
-    environment:
-      REALMRUNNER_PASSWORD_HASH: "$2a$10$YourBcryptHashHere"
-      REALMRUNNER_MAX_RUNNING: 3
-      REALMRUNNER_PORT_RANGE: "25565-25600"
-      REALMRUNNER_MEMORY_MB: 2048
-      REALMRUNNER_BASE_URL: "minecraft.example.com"  # Your server domain/IP
-    restart: unless-stopped
+```bash
+git clone git@github.com:wzin/realmrunner.git
+cd realmrunner
 ```
 
 2. Generate a password hash:
 
 ```bash
-./generate-password.sh yourpassword
-# Copy the output and paste into docker-compose.yml
+python3 gen_password.py yourpassword
 ```
 
-3. Start the container:
+3. Create a `.env` file:
 
 ```bash
+REALMRUNNER_PASSWORD_HASH=$$2b$$12$$YourHashHere
+REALMRUNNER_JWT_SECRET=your-random-secret
+```
+
+4. Build and start:
+
+```bash
+docker compose build
 docker compose up -d
 ```
 
-4. Open your browser to `http://localhost:8080`
+5. Access the web UI at `http://localhost:8080` (if port 8080 is uncommented in compose.yaml)
 
-5. Login with your password and start creating servers!
+### Production Deployment with Traefik
+
+RealmRunner is designed to run behind Traefik for SSL termination. The `compose.yaml` includes Traefik labels that route `realmrunner.ziniewicz.eu` to the container. In production, port 8080 is not exposed directly -- Traefik routes to it via the Docker network.
+
+For Komodo deployment, set `REALMRUNNER_PASSWORD_HASH` and `REALMRUNNER_JWT_SECRET` as environment variables in the Komodo stack configuration. Use the **unescaped** bcrypt hash (single `$` signs) in Komodo's UI.
 
 ## Configuration
 
@@ -80,43 +62,26 @@ docker compose up -d
 
 | Variable | Description | Default | Required |
 |----------|-------------|---------|----------|
-| `REALMRUNNER_PASSWORD_HASH` | Bcrypt hash of your password | - | ✅ |
-| `REALMRUNNER_MAX_RUNNING` | Maximum number of running servers | 3 | ❌ |
-| `REALMRUNNER_PORT_RANGE` | Port range for Minecraft servers | 25565-25600 | ❌ |
-| `REALMRUNNER_MEMORY_MB` | Memory allocation per server (MB) | 2048 | ❌ |
-| `REALMRUNNER_DATA_DIR` | Data directory path | /data | ❌ |
-| `REALMRUNNER_BASE_URL` | Base URL/domain for server connections (displayed in UI) | localhost | ❌ |
+| `REALMRUNNER_PASSWORD_HASH` | Bcrypt hash of your password | - | Yes |
+| `REALMRUNNER_JWT_SECRET` | JWT signing secret | - | Yes |
+| `REALMRUNNER_MAX_RUNNING` | Maximum number of running servers | 3 | No |
+| `REALMRUNNER_PORT_RANGE` | Port range for Minecraft servers | 25565-25600 | No |
+| `REALMRUNNER_MEMORY_MB` | Memory allocation per server (MB) | 2048 | No |
+| `REALMRUNNER_DATA_DIR` | Data directory path | /data | No |
+| `REALMRUNNER_BASE_URL` | Domain for server connection display | localhost | No |
 
 ### Generating a Password Hash
 
-**Using the included script (recommended):**
-
 ```bash
-./generate-password.sh yourpassword
-```
+# Using the included Python script (outputs $$-escaped hash for compose/env files)
+python3 gen_password.py yourpassword
 
-This outputs the password hash ready to paste into docker-compose.yml:
-```
-$$2b$$12$$fCVYd0CY9GgtKyW17AyIzO2Qqbb8eONp3e0Izhl1T8yZqsnxwZGcm
-```
-
-Then update docker-compose.yml:
-```yaml
-REALMRUNNER_PASSWORD_HASH: "$$2b$$12$$fCVYd0CY9GgtKyW17AyIzO2Qqbb8eONp3e0Izhl1T8yZqsnxwZGcm"
-```
-
-**Note:** The `$$` is required for docker-compose.yml (escapes `$` signs).
-
-**Manual methods:**
-
-```bash
 # Using Docker with Python
 docker run --rm python:3.11-slim sh -c \
   "pip install -q bcrypt && python -c 'import bcrypt; print(bcrypt.hashpw(b\"yourpassword\", bcrypt.gensalt()).decode())'"
-
-# Using online tool (less secure for production)
-# Visit: https://bcrypt-generator.com/ (set cost to 10)
 ```
+
+**Note:** In `.env` files and `compose.yaml`, `$` signs must be escaped as `$$`. In Komodo or other UIs that set env vars directly, use the unescaped hash.
 
 ## Usage
 
@@ -128,15 +93,9 @@ docker run --rm python:3.11-slim sh -c \
 4. Specify a port (within configured range)
 5. Click **"Create"**
 
-The server will be downloaded, configured, and ready to start.
-
 ### Starting a Server
 
-Click the **"Start"** button on a server card. The server will transition through:
-- **Starting**: Server is launching
-- **Running**: Server is online and accepting connections
-
-Connect to your server using the displayed server address (e.g., `minecraft.example.com:25565`)
+Click the **"Start"** button on a server card. Connect using the displayed address (e.g., `realmrunner.ziniewicz.eu:25565`).
 
 ### Stopping a Server
 
@@ -151,7 +110,7 @@ Click the **"Stop"** button. The server will gracefully shut down (30 second tim
 
 ### Wiping Server Data
 
-Click the **"Wipeout"** button to permanently delete all server data (world, logs, configs). This action cannot be undone.
+Click the **"Wipeout"** button to permanently delete all server data. This cannot be undone.
 
 ## Data Persistence
 
@@ -185,71 +144,52 @@ Mount a host directory to `/data` to persist servers across container restarts.
 ## Security
 
 ### Authentication
-- RealmRunner uses password-based authentication
+- Password-based authentication with bcrypt hashing
 - All users share the same password (no user accounts)
-- HTTPS is **strongly recommended** for production (use a reverse proxy like Nginx or Caddy)
+- SSL terminated by Traefik in production
 
 ### Network Security
-- Only expose necessary ports from Docker
+- Only Minecraft ports (25565-25600) are exposed to the host
+- Web UI is accessed via Traefik reverse proxy (not exposed directly in production)
 - Use firewall rules to restrict Minecraft port access
-- Consider VPN for administrative access
-- Change default ports if exposed to the internet
 
 ### Best Practices
 - Use a strong password (16+ characters)
 - Regularly backup the `/data` volume
-- Monitor resource usage to prevent DoS
 - Keep Docker image updated
-
-## Troubleshooting
-
-### Server Won't Start
-- Check available memory on host
-- Verify port isn't already in use
-- Check logs in the console view
-- Ensure Java 17+ is in the Docker image
-
-### Can't Connect to Server
-- Verify server status is "Running"
-- Check firewall rules allow the port
-- Ensure port is correctly mapped in Docker
-- Verify client Minecraft version matches server
-
-### Password Not Working
-- Verify bcrypt hash is correctly set in environment
-- Check hash doesn't have quotes or escaping issues
-- Regenerate hash and update environment
-
-### Out of Memory
-- Reduce `REALMRUNNER_MEMORY_MB` per server
-- Reduce `REALMRUNNER_MAX_RUNNING`
-- Add more RAM to host
-- Monitor resource usage per server
 
 ## Building from Source
 
-If you want to build locally instead of using the pre-built image:
-
 ```bash
-# Clone repository
 git clone git@github.com:wzin/realmrunner.git
 cd realmrunner
-
-# Build Docker image
-docker build -t realmrunner:latest .
-
-# Update docker-compose.yml to use local image:
-# image: realmrunner:latest
-# build: .
-
-# Run
+docker compose build
 docker compose up -d
 ```
 
+The Dockerfile uses a multi-stage build: Node.js for the Vue frontend, Go for the backend, and eclipse-temurin:21-jre for the runtime.
+
 ## Development
 
-See `IMPLEMENTATION.md` for detailed implementation specifications.
+### Backend
 
+```bash
+cd backend
+go mod download
+export REALMRUNNER_PASSWORD_HASH="your-hash"
+export REALMRUNNER_DATA_DIR="./data"
+go run .
+```
+
+### Frontend
+
+```bash
+cd frontend
+npm install
+npm run dev  # Dev server at http://localhost:5173, proxies API to :8080
+```
+
+See `IMPLEMENTATION.md` for detailed implementation specifications.
 See `CLAUDE.md` for development context and architecture decisions.
 
 ## License
@@ -260,12 +200,3 @@ MIT License - see LICENSE file for details
 
 - Issues: https://github.com/wzin/realmrunner/issues
 - Pull Requests: https://github.com/wzin/realmrunner/pulls
-
-## Roadmap
-
-- [ ] User accounts and permissions
-- [ ] Automatic backups
-- [ ] server.properties editor
-- [ ] Plugin support (Paper, Spigot, Fabric)
-- [ ] Resource usage alerts
-- [ ] Whitelist/ops management UI

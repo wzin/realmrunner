@@ -4,18 +4,20 @@
 
 ### 1. Generate a Password Hash
 
-First, generate a bcrypt hash for your password:
-
 ```bash
-cd scripts
-go run generate-password.go yourpassword
+python3 gen_password.py yourpassword
 ```
 
 Copy the generated hash.
 
-### 2. Update docker-compose.yml
+### 2. Create a .env file
 
-Replace the `REALMRUNNER_PASSWORD_HASH` value in `docker-compose.yml` with your generated hash.
+Create a `.env` file in the project root:
+
+```bash
+REALMRUNNER_PASSWORD_HASH=$$2b$$12$$YourHashHere
+REALMRUNNER_JWT_SECRET=your-random-secret
+```
 
 ### 3. Build and Run
 
@@ -32,7 +34,9 @@ docker compose logs -f
 
 ### 4. Access the Application
 
-Open your browser to http://localhost:8080
+For local development, uncomment the `8080:8080` port mapping in `compose.yaml`, then open http://localhost:8080.
+
+In production, access via the Traefik-routed domain (e.g., `https://realmrunner.ziniewicz.eu`).
 
 Login with the password you used to generate the hash.
 
@@ -46,7 +50,7 @@ cd backend
 # Download dependencies
 go mod download
 
-# Run backend (requires PostgreSQL or SQLite)
+# Run backend
 export REALMRUNNER_PASSWORD_HASH="your-hash"
 export REALMRUNNER_DATA_DIR="./data"
 go run .
@@ -60,7 +64,7 @@ cd frontend
 # Install dependencies
 npm install
 
-# Run dev server (proxies API to backend)
+# Run dev server (proxies API to backend on :8080)
 npm run dev
 ```
 
@@ -86,11 +90,12 @@ go build -o realmrunner
 | Variable | Required | Default | Description |
 |----------|----------|---------|-------------|
 | `REALMRUNNER_PASSWORD_HASH` | Yes | - | Bcrypt hash of password |
+| `REALMRUNNER_JWT_SECRET` | Yes | - | JWT signing secret |
 | `REALMRUNNER_MAX_RUNNING` | No | 3 | Max concurrent servers |
 | `REALMRUNNER_PORT_RANGE` | No | 25565-25600 | Port range for servers |
 | `REALMRUNNER_MEMORY_MB` | No | 2048 | Memory per server (MB) |
 | `REALMRUNNER_DATA_DIR` | No | /data | Data directory |
-| `REALMRUNNER_JWT_SECRET` | No | auto | JWT signing secret |
+| `REALMRUNNER_BASE_URL` | No | localhost | Domain for server connection display |
 
 ## Project Structure
 
@@ -111,8 +116,18 @@ realmrunner/
 │       └── router/      # Vue Router
 ├── scripts/             # Utility scripts
 ├── Dockerfile           # Multi-stage build
-└── docker-compose.yml   # Deployment config
+└── compose.yaml         # Deployment config
 ```
+
+## Deployment
+
+RealmRunner is deployed via Komodo using the `compose.yaml` in this repo. SSL is terminated by Traefik from the homecloud stack. The `traefik_proxy` Docker network connects the two.
+
+Key deployment details:
+- Traefik routes `realmrunner.ziniewicz.eu` to port 8080 inside the container
+- Minecraft ports 25565-25600 are exposed directly to the host
+- Environment variables (`REALMRUNNER_PASSWORD_HASH`, `REALMRUNNER_JWT_SECRET`) are set in Komodo's stack config
+- Data persists in `./data` mounted to `/data` in the container
 
 ## Common Tasks
 
@@ -150,8 +165,7 @@ realmrunner/
 
 ### Frontend build fails
 
-- Delete `node_modules` and `package-lock.json`
-- Run `npm install` again
+- Delete `node_modules` and run `npm install` again
 
 ### Server won't start
 
@@ -171,8 +185,3 @@ realmrunner/
 - Read [IMPLEMENTATION.md](IMPLEMENTATION.md) for technical details
 - Read [README.md](README.md) for user documentation
 - Read [CLAUDE.md](CLAUDE.md) for development context
-
-## Support
-
-- GitHub Issues: https://github.com/wzin/realmrunner/issues
-- Documentation: Check the docs in this repository
