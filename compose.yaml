@@ -1,7 +1,8 @@
 services:
   realmrunner:
-    build: .
-    image: realmrunner:latest
+    build:
+      context: .
+      network: host
     container_name: realmrunner
     restart: unless-stopped
     ports:
