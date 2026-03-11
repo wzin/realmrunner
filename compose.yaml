@@ -1,0 +1,29 @@
+services:
+  realmrunner:
+    build: .
+    image: realmrunner:latest
+    container_name: realmrunner
+    restart: unless-stopped
+    ports:
+      - "25565-25600:25565-25600"
+    volumes:
+      - ./data:/data
+    networks:
+      - traefik_proxy
+    environment:
+      REALMRUNNER_PASSWORD_HASH: "${REALMRUNNER_PASSWORD_HASH}"
+      REALMRUNNER_MAX_RUNNING: "${REALMRUNNER_MAX_RUNNING:-3}"
+      REALMRUNNER_PORT_RANGE: "25565-25600"
+      REALMRUNNER_MEMORY_MB: "${REALMRUNNER_MEMORY_MB:-2048}"
+      REALMRUNNER_JWT_SECRET: "${REALMRUNNER_JWT_SECRET}"
+      REALMRUNNER_BASE_URL: "realmrunner.ziniewicz.eu"
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.realmrunner.rule=Host(`realmrunner.ziniewicz.eu`)"
+      - "traefik.http.routers.realmrunner.entrypoints=websecure"
+      - "traefik.http.routers.realmrunner.tls.certresolver=letsencrypt"
+      - "traefik.http.services.realmrunner.loadbalancer.server.port=8080"
+
+networks:
+  traefik_proxy:
+    external: true
