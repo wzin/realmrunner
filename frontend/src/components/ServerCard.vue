@@ -49,13 +49,28 @@
 
     <div class="server-actions">
       <button
-        v-if="server.status === 'stopped'"
+        v-if="server.status === 'stopped' && server.ready"
         @click="handleStart"
         class="btn btn-success btn-sm"
-        :disabled="loading || !server.ready"
-        :title="!server.ready ? 'Downloading server JAR...' : ''"
+        :disabled="loading"
       >
-        {{ server.ready ? 'Start' : 'Downloading...' }}
+        Start
+      </button>
+      <button
+        v-else-if="server.status === 'stopped' && !server.ready && isStaleDownload"
+        @click="handleStart"
+        class="btn btn-warning btn-sm"
+        :disabled="loading"
+        title="Download may have failed. Try starting anyway."
+      >
+        Retry Start
+      </button>
+      <button
+        v-else-if="server.status === 'stopped' && !server.ready"
+        class="btn btn-secondary btn-sm"
+        disabled
+      >
+        Downloading...
       </button>
       <button
         v-else-if="server.status === 'running'"
@@ -189,6 +204,13 @@ let metricsWs = null
 
 const displayMetrics = computed(() => {
   return liveMetrics.value || props.server.metrics
+})
+
+const isStaleDownload = computed(() => {
+  if (props.server.ready) return false
+  const created = new Date(props.server.created_at)
+  const now = new Date()
+  return (now - created) > 10 * 60 * 1000 // 10 minutes
 })
 
 const playerTooltip = computed(() => {
