@@ -7,17 +7,19 @@
       </div>
 
       <div class="editor-container">
-        <div class="file-list">
-          <div
-            v-for="f in files"
-            :key="f.path"
-            :class="['file-item', { active: selectedFile === f.path }]"
-            @click="selectFile(f)"
-          >
-            <span class="file-name">{{ f.name }}</span>
-            <span class="file-size">{{ formatSize(f.size) }}</span>
-          </div>
-          <div v-if="!files.length && !loadingFiles" class="empty-files">No editable files found</div>
+        <div class="file-tree">
+          <div v-if="loadingFiles" class="tree-loading">Loading...</div>
+          <div v-else-if="!files.length" class="tree-empty">No editable files</div>
+          <template v-else>
+            <FileTreeNode
+              v-for="node in fileTree"
+              :key="node.path || node.name"
+              :node="node"
+              :selected="selectedFile"
+              :depth="0"
+              @select="selectFile"
+            />
+          </template>
         </div>
 
         <div class="file-editor">
@@ -33,12 +35,7 @@
                 </button>
               </div>
             </div>
-            <textarea
-              v-model="content"
-              class="editor-textarea"
-              spellcheck="false"
-              @input="saved = false"
-            ></textarea>
+            <div ref="editorEl" class="codemirror-wrapper"></div>
           </template>
           <div v-if="error" class="alert alert-error">{{ error }}</div>
         </div>
@@ -50,13 +47,134 @@
 </template>
 
 <script setup>
-import { ref, onMounted } from 'vue'
+import { ref, onMounted, nextTick, watch, onUnmounted, h as createElement, defineComponent } from 'vue'
 import { api } from '../api/client'
+import { EditorView, keymap, lineNumbers, highlightActiveLine } from '@codemirror/view'
+import { EditorState } from '@codemirror/state'
+import { json } from '@codemirror/lang-json'
+import { yaml } from '@codemirror/lang-yaml'
+import { StreamLanguage } from '@codemirror/language'
+import { oneDark } from '@codemirror/theme-one-dark'
+import { defaultKeymap } from '@codemirror/commands'
+
+// Simple properties/ini language definition
+const propertiesLang = StreamLanguage.define({
+  token(stream) {
+    if (stream.match(/^#.*/)) return 'comment'
+    if (stream.match(/^;.*/)) return 'comment'
+    if (stream.match(/^[a-zA-Z0-9._-]+(?==)/)) return 'propertyName'
+    if (stream.match(/^=/)) return 'operator'
+    stream.next()
+    return null
+  }
+})
+
+function getLanguageExt(filename) {
+  const ext = filename.split('.').pop().toLowerCase()
+  switch (ext) {
+    case 'json': return json()
+    case 'yml':
+    case 'yaml': return yaml()
+    case 'properties':
+    case 'ini':
+    case 'cfg':
+    case 'conf':
+    case 'toml':
+      return propertiesLang
+    default: return propertiesLang
+  }
+}
+
+// FileTreeNode component (inline)
+const FileTreeNode = defineComponent({
+  name: 'FileTreeNode',
+  props: {
+    node: Object,
+    selected: String,
+    depth: Number,
+  },
+  emits: ['select'],
+  setup(props, { emit }) {
+    const expanded = ref(props.depth < 1) // auto-expand first level
+
+    function toggle() {
+      if (props.node.children) {
+        expanded.value = !expanded.value
+      } else {
+        emit('select', props.node)
+      }
+    }
+
+    return () => {
+      const items = []
+      const isDir = !!props.node.children
+      const isActive = !isDir && props.selected === props.node.path
+      const indent = `${props.depth * 12 + 8}px`
+
+      items.push(
+        createElement('div', {
+          class: ['tree-item', { active: isActive, dir: isDir }],
+          style: { paddingLeft: indent },
+          onClick: toggle,
+        }, [
+          createElement('span', { class: 'tree-icon' }, isDir ? (expanded.value ? '\u25BC' : '\u25B6') : '\u2022'),
+          createElement('span', { class: 'tree-label' }, props.node.name),
+          !isDir ? createElement('span', { class: 'tree-size' }, formatSize(props.node.size)) : null,
+        ])
+      )
+
+      if (isDir && expanded.value) {
+        for (const child of props.node.children) {
+          items.push(
+            createElement(FileTreeNode, {
+              node: child,
+              selected: props.selected,
+              depth: props.depth + 1,
+              onSelect: (f) => emit('select', f),
+            })
+          )
+        }
+      }
+
+      return createElement('div', null, items)
+    }
+  }
+})
+
+function formatSize(bytes) {
+  if (!bytes) return ''
+  if (bytes < 1024) return bytes + 'B'
+  return (bytes / 1024).toFixed(1) + 'K'
+}
+
+function buildTree(files) {
+  const root = []
+  const dirs = {}
+
+  for (const f of files) {
+    const parts = f.path.split('/')
+    if (parts.length === 1) {
+      root.push({ name: f.name, path: f.path, size: f.size })
+    } else {
+      const dirName = parts[0]
+      if (!dirs[dirName]) {
+        dirs[dirName] = { name: dirName, children: [] }
+      }
+      dirs[dirName].children.push({ name: parts.slice(1).join('/'), path: f.path, size: f.size })
+    }
+  }
+
+  // Dirs first, then files
+  const dirNodes = Object.values(dirs).sort((a, b) => a.name.localeCompare(b.name))
+  const fileNodes = root.sort((a, b) => a.name.localeCompare(b.name))
+  return [...dirNodes, ...fileNodes]
+}
 
 const props = defineProps({ server: { type: Object, required: true } })
 defineEmits(['close'])
 
 const files = ref([])
+const fileTree = ref([])
 const loadingFiles = ref(true)
 const selectedFile = ref(null)
 const content = ref('')
@@ -64,12 +182,15 @@ const loadingContent = ref(false)
 const saving = ref(false)
 const saved = ref(false)
 const error = ref('')
+const editorEl = ref(null)
+let editorView = null
 
 async function loadFiles() {
   loadingFiles.value = true
   try {
     const resp = await api.getFiles(props.server.id)
     files.value = resp.files || []
+    fileTree.value = buildTree(files.value)
   } catch (err) {
     error.value = 'Failed to load files'
   } finally {
@@ -85,12 +206,50 @@ async function selectFile(f) {
   try {
     const resp = await api.getFile(props.server.id, f.path)
     content.value = resp.content
+    await nextTick()
+    initEditor(f.name, resp.content)
   } catch (err) {
     error.value = 'Failed to load file'
     content.value = ''
   } finally {
     loadingContent.value = false
   }
+}
+
+function initEditor(filename, text) {
+  if (editorView) {
+    editorView.destroy()
+    editorView = null
+  }
+  if (!editorEl.value) return
+
+  const langExt = getLanguageExt(filename)
+
+  editorView = new EditorView({
+    state: EditorState.create({
+      doc: text,
+      extensions: [
+        lineNumbers(),
+        highlightActiveLine(),
+        keymap.of(defaultKeymap),
+        langExt,
+        oneDark,
+        EditorView.updateListener.of((update) => {
+          if (update.docChanged) {
+            content.value = update.state.doc.toString()
+            saved.value = false
+          }
+        }),
+        EditorView.theme({
+          '&': { height: '100%', fontSize: '13px' },
+          '.cm-scroller': { overflow: 'auto', fontFamily: "'Courier New', monospace" },
+          '.cm-content': { caretColor: 'var(--accent)' },
+          '&.cm-focused .cm-cursor': { borderLeftColor: 'var(--accent)' },
+        }),
+      ],
+    }),
+    parent: editorEl.value,
+  })
 }
 
 async function handleSave() {
@@ -106,17 +265,16 @@ async function handleSave() {
   }
 }
 
-function formatSize(bytes) {
-  if (bytes < 1024) return bytes + ' B'
-  return (bytes / 1024).toFixed(1) + ' KB'
-}
+onUnmounted(() => {
+  if (editorView) editorView.destroy()
+})
 
 onMounted(loadFiles)
 </script>
 
 <style scoped>
 .modal-large {
-  max-width: 900px;
+  max-width: 950px;
   height: 85vh;
   display: flex;
   flex-direction: column;
@@ -142,33 +300,60 @@ onMounted(loadFiles)
   min-height: 0;
 }
 
-.file-list {
-  width: 200px;
+/* Tree */
+.file-tree {
+  width: 220px;
   flex-shrink: 0;
   overflow-y: auto;
   border: 2px solid var(--border);
   border-radius: 2px;
   background: var(--bg-input);
+  font-size: 0.75rem;
 }
 
-.file-item {
-  padding: 0.5rem 0.75rem;
-  cursor: pointer;
-  border-bottom: 1px solid var(--border);
+.tree-loading, .tree-empty {
+  padding: 1rem;
+  text-align: center;
+  color: var(--text-muted);
+}
+
+:deep(.tree-item) {
   display: flex;
-  flex-direction: column;
-  gap: 0.125rem;
+  align-items: center;
+  gap: 0.375rem;
+  padding: 0.3rem 0.5rem;
+  cursor: pointer;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  border-bottom: 1px solid transparent;
 }
 
-.file-item:hover { background: var(--border); }
-.file-item.active { background: var(--accent); color: var(--accent-text); }
-.file-item.active .file-size { color: var(--accent-text); }
+:deep(.tree-item:hover) { background: var(--border); }
+:deep(.tree-item.active) { background: var(--accent); color: var(--accent-text); }
+:deep(.tree-item.active .tree-size) { color: var(--accent-text); }
+:deep(.tree-item.dir) { font-weight: 600; }
 
-.file-name { font-size: 0.75rem; word-break: break-all; }
-.file-size { font-size: 0.625rem; color: var(--text-muted); }
+:deep(.tree-icon) {
+  font-size: 0.5rem;
+  width: 0.75rem;
+  text-align: center;
+  flex-shrink: 0;
+}
 
-.empty-files { padding: 1rem; text-align: center; color: var(--text-muted); font-size: 0.75rem; }
+:deep(.tree-label) {
+  flex: 1;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
 
+:deep(.tree-size) {
+  font-size: 0.5625rem;
+  color: var(--text-muted);
+  flex-shrink: 0;
+}
+
+/* Editor */
 .file-editor {
   flex: 1;
   display: flex;
@@ -191,25 +376,29 @@ onMounted(loadFiles)
   margin-bottom: 0.5rem;
 }
 
-.editor-path { font-size: 0.75rem; color: var(--text-muted); font-family: monospace; }
+.editor-path {
+  font-size: 0.6875rem;
+  color: var(--text-muted);
+  font-family: monospace;
+  background: var(--bg-input);
+  padding: 0.25rem 0.5rem;
+  border: 1px solid var(--border);
+  border-radius: 2px;
+}
+
 .editor-actions { display: flex; align-items: center; gap: 0.5rem; }
 .save-indicator { font-size: 0.625rem; color: var(--accent); font-family: 'Press Start 2P', monospace; }
 
-.editor-textarea {
+.codemirror-wrapper {
   flex: 1;
-  background: var(--bg-input);
-  color: var(--text-primary);
   border: 2px solid var(--border);
   border-radius: 2px;
-  padding: 0.75rem;
-  font-family: 'Courier New', monospace;
-  font-size: 0.8125rem;
-  line-height: 1.5;
-  resize: none;
-  tab-size: 4;
+  overflow: hidden;
 }
 
-.editor-textarea:focus { outline: none; border-color: var(--accent); }
+.codemirror-wrapper :deep(.cm-editor) {
+  height: 100%;
+}
 
 .editor-warning {
   margin-top: 0.75rem;

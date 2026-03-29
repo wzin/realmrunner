@@ -53,7 +53,7 @@ func setupTestEnv(t *testing.T) (*gin.Engine, string, func()) {
 	metrics.InitMetricsTable(db)
 	backup.InitBackupTable(db)
 
-	collector := metrics.NewCollector(db)
+	collector := metrics.NewCollector(db, nil)
 	registry := minecraft.NewRegistry()
 	cgroupMgr := cgroup.NewManager()
 	manager := server.NewManager(db, cfg, collector, registry, cgroupMgr)

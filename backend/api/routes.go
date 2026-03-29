@@ -57,6 +57,13 @@ func RegisterRoutes(
 	protected.GET("/servers/:id/files/*path", handlers.ReadFile)
 	protected.PUT("/servers/:id/files/*path", handlers.WriteFile)
 
+	// Mods
+	protected.GET("/servers/:id/mods", handlers.ListMods)
+	protected.POST("/servers/:id/mods/search", handlers.SearchMods)
+	protected.GET("/servers/:id/mods/versions/:projectId", handlers.GetModVersions)
+	protected.POST("/servers/:id/mods", handlers.InstallMod)
+	protected.DELETE("/servers/:id/mods/:modId", handlers.RemoveMod)
+
 	// Backups
 	protected.GET("/servers/:id/backups", handlers.ListBackups)
 	protected.POST("/servers/:id/backups", handlers.CreateBackup)

@@ -28,18 +28,18 @@
       </div>
     </div>
 
-    <div v-if="server.metrics" class="metrics-row">
+    <div v-if="displayMetrics" class="metrics-row">
       <div class="metric">
         <span class="metric-label">CPU</span>
-        <span class="metric-value">{{ server.metrics.cpu_percent.toFixed(1) }}%</span>
+        <span class="metric-value">{{ displayMetrics.cpu_percent.toFixed(1) }}%</span>
       </div>
       <div class="metric">
         <span class="metric-label">RAM</span>
-        <span class="metric-value">{{ server.metrics.memory_mb.toFixed(0) }} MB</span>
+        <span class="metric-value">{{ displayMetrics.memory_mb.toFixed(0) }} MB</span>
       </div>
       <div class="metric" :title="playerTooltip">
         <span class="metric-label">Players</span>
-        <span class="metric-value">{{ server.metrics.player_count }}</span>
+        <span class="metric-value">{{ displayMetrics.player_count }}</span>
       </div>
     </div>
 
@@ -134,6 +134,14 @@
       </button>
 
       <button
+        v-if="server.flavor && server.flavor !== 'vanilla'"
+        @click="$emit('mods', server)"
+        class="btn btn-secondary btn-sm"
+      >
+        Mods
+      </button>
+
+      <button
         v-if="server.status === 'stopped'"
         @click="handleReset"
         class="btn btn-warning btn-sm"
@@ -155,8 +163,8 @@
 </template>
 
 <script setup>
-import { ref, computed } from 'vue'
-import { api } from '../api/client'
+import { ref, computed, watch, onUnmounted } from 'vue'
+import { api, createWebSocket } from '../api/client'
 
 const props = defineProps({
   server: {
@@ -165,16 +173,58 @@ const props = defineProps({
   }
 })
 
-const emit = defineEmits(['refresh', 'console', 'metrics', 'upgrade', 'limits', 'files', 'players', 'backups'])
+const emit = defineEmits(['refresh', 'console', 'metrics', 'upgrade', 'limits', 'files', 'players', 'backups', 'mods'])
 
 const loading = ref(false)
 const error = ref('')
+const liveMetrics = ref(null)
+let metricsWs = null
+
+const displayMetrics = computed(() => {
+  return liveMetrics.value || props.server.metrics
+})
 
 const playerTooltip = computed(() => {
-  if (props.server.metrics && props.server.metrics.player_names && props.server.metrics.player_names.length > 0) {
-    return props.server.metrics.player_names.join(', ')
+  const m = displayMetrics.value
+  if (m && m.player_names && m.player_names.length > 0) {
+    return m.player_names.join(', ')
   }
   return 'No players online'
+})
+
+function connectMetricsWs() {
+  if (metricsWs) { metricsWs.close(); metricsWs = null }
+  if (props.server.status !== 'running') return
+
+  try {
+    metricsWs = createWebSocket(props.server.id)
+    metricsWs.onmessage = (event) => {
+      const data = JSON.parse(event.data)
+      if (data.type === 'metrics') {
+        liveMetrics.value = {
+          cpu_percent: data.cpu_percent,
+          memory_mb: data.memory_mb,
+          player_count: data.player_count,
+          player_names: data.player_names || [],
+        }
+      }
+    }
+    metricsWs.onerror = () => {}
+    metricsWs.onclose = () => { metricsWs = null }
+  } catch (e) {}
+}
+
+watch(() => props.server.status, (newStatus) => {
+  if (newStatus === 'running') {
+    connectMetricsWs()
+  } else {
+    if (metricsWs) { metricsWs.close(); metricsWs = null }
+    liveMetrics.value = null
+  }
+}, { immediate: true })
+
+onUnmounted(() => {
+  if (metricsWs) { metricsWs.close(); metricsWs = null }
 })
 
 async function handleStart() {

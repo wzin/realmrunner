@@ -69,6 +69,13 @@ export const api = {
     body: JSON.stringify({ command }),
   }),
 
+  // Mods
+  getMods: (id) => request(`/servers/${id}/mods`),
+  searchMods: (id, query, limit) => request(`/servers/${id}/mods/search`, { method: 'POST', body: JSON.stringify({ query, limit: limit || 20 }) }),
+  getModVersions: (id, projectId) => request(`/servers/${id}/mods/versions/${projectId}`),
+  installMod: (id, modrinthId, versionId) => request(`/servers/${id}/mods`, { method: 'POST', body: JSON.stringify({ modrinth_id: modrinthId, version_id: versionId }) }),
+  removeMod: (id, modId) => request(`/servers/${id}/mods/${modId}`, { method: 'DELETE' }),
+
   // Backups
   getBackups: (id) => request(`/servers/${id}/backups`),
   createBackup: (id) => request(`/servers/${id}/backups`, { method: 'POST' }),

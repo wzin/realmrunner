@@ -50,6 +50,7 @@
           @files="openFiles"
           @players="openPlayers"
           @backups="openBackups"
+          @mods="openMods"
         />
       </div>
     </main>
@@ -103,6 +104,12 @@
       :server="backupsServer"
       @close="backupsServer = null"
     />
+
+    <ModsModal
+      v-if="modsServer"
+      :server="modsServer"
+      @close="modsServer = null"
+    />
   </div>
 </template>
 
@@ -119,6 +126,7 @@ import LimitsModal from '../components/LimitsModal.vue'
 import FileEditorModal from '../components/FileEditorModal.vue'
 import WhitelistModal from '../components/WhitelistModal.vue'
 import BackupsModal from '../components/BackupsModal.vue'
+import ModsModal from '../components/ModsModal.vue'
 import ThemeSwitcher from '../components/ThemeSwitcher.vue'
 
 const router = useRouter()
@@ -133,6 +141,7 @@ const limitsServer = ref(null)
 const filesServer = ref(null)
 const playersServer = ref(null)
 const backupsServer = ref(null)
+const modsServer = ref(null)
 
 async function loadServers() {
   loading.value = true
@@ -176,6 +185,10 @@ function handleUpgraded() {
 
 function openLimits(server) {
   limitsServer.value = server
+}
+
+function openMods(server) {
+  modsServer.value = server
 }
 
 function openBackups(server) {

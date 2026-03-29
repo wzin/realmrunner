@@ -12,6 +12,7 @@ import (
 	"github.com/wzin/realmrunner/backup"
 	"github.com/wzin/realmrunner/cgroup"
 	"github.com/wzin/realmrunner/metrics"
+	"github.com/wzin/realmrunner/mods"
 	"github.com/wzin/realmrunner/minecraft"
 	"github.com/wzin/realmrunner/scheduler"
 	"github.com/wzin/realmrunner/server"
@@ -42,8 +43,17 @@ func main() {
 		log.Fatalf("Failed to initialize backup table: %v", err)
 	}
 
-	// Initialize metrics collector
-	collector := metrics.NewCollector(db)
+	// Initialize WebSocket hub (needed by collector)
+	hub := websocket.NewHub()
+	go hub.Run()
+
+	// Initialize mods table
+	if err := mods.InitModsTable(db); err != nil {
+		log.Fatalf("Failed to initialize mods table: %v", err)
+	}
+
+	// Initialize metrics collector (with hub for live broadcasting)
+	collector := metrics.NewCollector(db, hub)
 
 	// Initialize provider registry
 	registry := minecraft.NewRegistry()
@@ -57,10 +67,6 @@ func main() {
 	// Initialize scheduler
 	sched := scheduler.NewScheduler(db, manager)
 	sched.Start()
-
-	// Initialize WebSocket hub
-	hub := websocket.NewHub()
-	go hub.Run()
 
 	// Set up Gin router
 	if os.Getenv("GIN_MODE") != "debug" {

@@ -3,6 +3,7 @@ package metrics
 import (
 	"context"
 	"database/sql"
+	"encoding/json"
 	"fmt"
 	"log"
 	"os"
@@ -24,18 +25,25 @@ type cpuSample struct {
 	time  time.Time
 }
 
-type Collector struct {
-	db      *sql.DB
-	cancels map[string]context.CancelFunc
-	latest  map[string]*LatestMetrics
-	mu      sync.RWMutex
+// Broadcaster is an interface for pushing metrics to WebSocket clients
+type Broadcaster interface {
+	Broadcast(serverID string, data []byte)
 }
 
-func NewCollector(db *sql.DB) *Collector {
+type Collector struct {
+	db          *sql.DB
+	broadcaster Broadcaster
+	cancels     map[string]context.CancelFunc
+	latest      map[string]*LatestMetrics
+	mu          sync.RWMutex
+}
+
+func NewCollector(db *sql.DB, broadcaster Broadcaster) *Collector {
 	c := &Collector{
-		db:      db,
-		cancels: make(map[string]context.CancelFunc),
-		latest:  make(map[string]*LatestMetrics),
+		db:          db,
+		broadcaster: broadcaster,
+		cancels:     make(map[string]context.CancelFunc),
+		latest:      make(map[string]*LatestMetrics),
 	}
 	// Start daily purge
 	go c.purgeLoop()
@@ -148,6 +156,21 @@ func (c *Collector) collect(serverID string, pid int, port int, prevCPU *cpuSamp
 	}
 	if err := InsertMetric(c.db, metric); err != nil {
 		log.Printf("Failed to insert metric for %s: %v", serverID, err)
+	}
+
+	// Broadcast to WebSocket clients
+	if c.broadcaster != nil {
+		msg := map[string]interface{}{
+			"type":         "metrics",
+			"cpu_percent":  cpuPercent,
+			"memory_mb":    memoryMB,
+			"player_count": playerCount,
+			"player_names": playerNames,
+			"timestamp":    now.Format(time.RFC3339),
+		}
+		if data, err := json.Marshal(msg); err == nil {
+			c.broadcaster.Broadcast(serverID, data)
+		}
 	}
 
 	return currentSample
