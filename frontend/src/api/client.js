@@ -97,8 +97,8 @@ export const api = {
 
   // Files
   getFiles: (id) => request(`/servers/${id}/files`),
-  getFile: (id, path) => request(`/servers/${id}/files/${path}`),
-  saveFile: (id, path, content) => request(`/servers/${id}/files/${path}`, {
+  getFile: (id, path) => request(`/servers/${id}/file/${path}`),
+  saveFile: (id, path, content) => request(`/servers/${id}/file/${path}`, {
     method: 'PUT',
     body: JSON.stringify({ content }),
   }),

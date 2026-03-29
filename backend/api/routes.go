@@ -72,8 +72,8 @@ func RegisterRoutes(
 	protected.PUT("/servers/:id/limits", handlers.SetLimits)
 	protected.PUT("/servers/:id/schedule", handlers.SetSchedule)
 	protected.GET("/servers/:id/files", handlers.ListFiles)
-	protected.GET("/servers/:id/files/*path", handlers.ReadFile)
-	protected.PUT("/servers/:id/files/*path", handlers.WriteFile)
+	protected.GET("/servers/:id/file/*path", handlers.ReadFile)
+	protected.PUT("/servers/:id/file/*path", handlers.WriteFile)
 
 	// Mods
 	protected.GET("/servers/:id/mods", handlers.ListMods)

@@ -101,6 +101,10 @@ func listEditableFiles(serverDir string) ([]FileInfo, error) {
 			if skipDirs[base] && depth == 0 {
 				return filepath.SkipDir
 			}
+			// Skip hidden directories (e.g., .paper-remapped)
+			if strings.HasPrefix(base, ".") {
+				return filepath.SkipDir
+			}
 			if depth > 20 {
 				return filepath.SkipDir
 			}
