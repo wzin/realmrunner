@@ -84,6 +84,10 @@ func main() {
 		AllowCredentials: true,
 	}))
 
+	// Initialize realm tables and migrate
+	api.InitRealmTables(db)
+	api.MigrateToRealms(db)
+
 	// Auth middleware
 	authMiddleware := auth.NewMiddleware(cfg, db)
 

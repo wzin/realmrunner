@@ -26,18 +26,35 @@ func RegisterRoutes(
 
 	handlers := NewHandlers(manager, hub, cfg)
 	userHandlers := NewUserHandlers(authMiddleware)
+	realmHandlers := NewRealmHandlers(manager.GetDB())
 
 	// Self-service
 	protected.GET("/me", userHandlers.GetMe)
 	protected.PUT("/me/password", userHandlers.ChangePassword)
 
-	// User management (admin only)
-	admin := protected.Group("")
-	admin.Use(authMiddleware.RequireRole("admin"))
-	admin.GET("/users", userHandlers.ListUsers)
-	admin.POST("/users", userHandlers.CreateUser)
-	admin.PUT("/users/:id", userHandlers.UpdateUser)
-	admin.DELETE("/users/:id", userHandlers.DeleteUser)
+	// User management (owner only)
+	owner := protected.Group("")
+	owner.Use(authMiddleware.RequireRole("owner"))
+	owner.GET("/users", userHandlers.ListUsers)
+	owner.POST("/users", userHandlers.CreateUser)
+	owner.PUT("/users/:uid", userHandlers.UpdateUser)
+	owner.DELETE("/users/:uid", userHandlers.DeleteUser)
+
+	// Realm management (owner only)
+	owner.POST("/realms", realmHandlers.CreateRealm)
+	owner.PUT("/realms/:id", realmHandlers.UpdateRealm)
+	owner.DELETE("/realms/:id", realmHandlers.DeleteRealm)
+	owner.POST("/realms/:id/admins", realmHandlers.AddRealmAdmin)
+	owner.DELETE("/realms/:id/admins/:uid", realmHandlers.RemoveRealmAdmin)
+
+	// Realm listing (owner + admin)
+	protected.GET("/realms", realmHandlers.ListRealms)
+	protected.GET("/realms/:id/admins", realmHandlers.ListRealmAdmins)
+
+	// Server viewers (owner + admin)
+	protected.GET("/servers/:id/viewers", realmHandlers.ListServerViewers)
+	protected.POST("/servers/:id/viewers", realmHandlers.AddServerViewer)
+	protected.DELETE("/servers/:id/viewers/:uid", realmHandlers.RemoveServerViewer)
 
 	// Server endpoints
 	protected.GET("/servers", handlers.ListServers)

@@ -311,8 +311,8 @@ func TestUserManagement(t *testing.T) {
 	if me["username"] != "admin" {
 		t.Errorf("Expected username 'admin', got %v", me["username"])
 	}
-	if me["role"] != "admin" {
-		t.Errorf("Expected role 'admin', got %v", me["role"])
+	if me["role"] != "owner" {
+		t.Errorf("Expected role 'owner', got %v", me["role"])
 	}
 
 	// Create a new user
@@ -369,8 +369,8 @@ func TestUserManagement(t *testing.T) {
 		t.Errorf("Delete user failed: %d", w.Code)
 	}
 
-	// Cannot delete last admin
-	// Get admin user ID first
+	// Cannot delete last owner
+	// Get owner user ID first
 	w = httptest.NewRecorder()
 	router.ServeHTTP(w, authReq("GET", "/api/me", token, nil))
 	json.Unmarshal(w.Body.Bytes(), &me)
@@ -379,7 +379,7 @@ func TestUserManagement(t *testing.T) {
 	w = httptest.NewRecorder()
 	router.ServeHTTP(w, authReq("DELETE", "/api/users/"+adminID, token, nil))
 	if w.Code != http.StatusBadRequest {
-		t.Errorf("Expected 400 when deleting last admin, got %d", w.Code)
+		t.Errorf("Expected 400 when deleting last owner, got %d", w.Code)
 	}
 }
 

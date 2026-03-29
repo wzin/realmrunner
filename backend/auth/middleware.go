@@ -82,13 +82,13 @@ func (m *Middleware) migrateFromSinglePassword() {
 	id := uuid.New().String()
 	_, err := m.db.Exec(
 		"INSERT INTO users (id, username, password_hash, role) VALUES (?, ?, ?, ?)",
-		id, "admin", m.config.PasswordHash, "admin",
+		id, "admin", m.config.PasswordHash, "owner",
 	)
 	if err != nil {
 		log.Printf("Failed to create default admin user: %v", err)
 		return
 	}
-	log.Println("Created default admin user (username: admin, password from REALMRUNNER_PASSWORD_HASH)")
+	log.Println("Created default owner user (username: admin, password from REALMRUNNER_PASSWORD_HASH)")
 }
 
 func (m *Middleware) Login(c *gin.Context) {
@@ -152,6 +152,12 @@ func (m *Middleware) RequireRole(roles ...string) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		role, _ := c.Get("role")
 		roleStr, _ := role.(string)
+
+		// Owner has access to everything
+		if roleStr == "owner" {
+			c.Next()
+			return
+		}
 
 		for _, r := range roles {
 			if roleStr == r {
@@ -266,15 +272,15 @@ func (m *Middleware) UpdateUser(id, role string) error {
 }
 
 func (m *Middleware) DeleteUser(id string) error {
-	// Don't allow deleting the last admin
-	var adminCount int
-	m.db.QueryRow("SELECT COUNT(*) FROM users WHERE role = 'admin'").Scan(&adminCount)
+	// Don't allow deleting the last owner
+	var ownerCount int
+	m.db.QueryRow("SELECT COUNT(*) FROM users WHERE role = 'owner'").Scan(&ownerCount)
 
 	var userRole string
 	m.db.QueryRow("SELECT role FROM users WHERE id = ?", id).Scan(&userRole)
 
-	if userRole == "admin" && adminCount <= 1 {
-		return fmt.Errorf("cannot delete the last admin user")
+	if userRole == "owner" && ownerCount <= 1 {
+		return fmt.Errorf("cannot delete the last owner user")
 	}
 
 	_, err := m.db.Exec("DELETE FROM users WHERE id = ?", id)

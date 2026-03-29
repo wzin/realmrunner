@@ -43,8 +43,8 @@ func (h *UserHandlers) CreateUser(c *gin.Context) {
 	}
 
 	// Validate role
-	if req.Role != "admin" && req.Role != "operator" && req.Role != "viewer" {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "role must be admin, operator, or viewer"})
+	if req.Role != "owner" && req.Role != "admin" && req.Role != "viewer" {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "role must be owner, admin, or viewer"})
 		return
 	}
 
@@ -58,7 +58,7 @@ func (h *UserHandlers) CreateUser(c *gin.Context) {
 }
 
 func (h *UserHandlers) UpdateUser(c *gin.Context) {
-	id := c.Param("id")
+	id := c.Param("uid")
 	var req struct {
 		Role string `json:"role" binding:"required"`
 	}
@@ -76,7 +76,7 @@ func (h *UserHandlers) UpdateUser(c *gin.Context) {
 }
 
 func (h *UserHandlers) DeleteUser(c *gin.Context) {
-	id := c.Param("id")
+	id := c.Param("uid")
 	if err := h.authMiddleware.DeleteUser(id); err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 		return
