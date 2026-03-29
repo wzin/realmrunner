@@ -44,6 +44,10 @@ export const api = {
     method: 'POST',
     body: JSON.stringify({ name, version, port, flavor: flavor || 'vanilla' }),
   }),
+  setLimits: (id, cpuLimit, memoryLimitMB) => request(`/servers/${id}/limits`, {
+    method: 'PUT',
+    body: JSON.stringify({ cpu_limit: cpuLimit, memory_limit_mb: memoryLimitMB }),
+  }),
   upgradeServer: (id, version, flavor) => request(`/servers/${id}/upgrade`, {
     method: 'POST',
     body: JSON.stringify({ version, flavor }),
@@ -55,6 +59,28 @@ export const api = {
   sendCommand: (id, command) => request(`/servers/${id}/command`, {
     method: 'POST',
     body: JSON.stringify({ command }),
+  }),
+
+  // Backups
+  getBackups: (id) => request(`/servers/${id}/backups`),
+  createBackup: (id) => request(`/servers/${id}/backups`, { method: 'POST' }),
+  restoreBackup: (id, bid) => request(`/servers/${id}/backups/${bid}/restore`, { method: 'POST' }),
+  deleteBackup: (id, bid) => request(`/servers/${id}/backups/${bid}`, { method: 'DELETE' }),
+
+  // Whitelist & Ops
+  getWhitelist: (id) => request(`/servers/${id}/whitelist`),
+  addToWhitelist: (id, name) => request(`/servers/${id}/whitelist`, { method: 'POST', body: JSON.stringify({ name }) }),
+  removeFromWhitelist: (id, uuid) => request(`/servers/${id}/whitelist/${uuid}`, { method: 'DELETE' }),
+  getOps: (id) => request(`/servers/${id}/ops`),
+  addOp: (id, name) => request(`/servers/${id}/ops`, { method: 'POST', body: JSON.stringify({ name }) }),
+  removeOp: (id, uuid) => request(`/servers/${id}/ops/${uuid}`, { method: 'DELETE' }),
+
+  // Files
+  getFiles: (id) => request(`/servers/${id}/files`),
+  getFile: (id, path) => request(`/servers/${id}/files/${path}`),
+  saveFile: (id, path, content) => request(`/servers/${id}/files/${path}`, {
+    method: 'PUT',
+    body: JSON.stringify({ content }),
   }),
 
   // Metrics

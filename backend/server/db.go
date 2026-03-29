@@ -17,6 +17,9 @@ type Server struct {
 	Flavor        string     `json:"flavor"`
 	Port          int        `json:"port"`
 	Status        string     `json:"status"`
+	CPULimit        float64    `json:"cpu_limit"`
+	MemoryLimitMB   int        `json:"memory_limit_mb"`
+	RestartSchedule string     `json:"restart_schedule"`
 	CreatedAt     time.Time  `json:"created_at"`
 	LastStartedAt *time.Time `json:"last_started_at,omitempty"`
 }
@@ -57,8 +60,11 @@ func InitDB(dataDir string) (*sql.DB, error) {
 		return nil, fmt.Errorf("failed to create schema: %w", err)
 	}
 
-	// Migration: add flavor column if missing
+	// Migrations
 	db.Exec("ALTER TABLE servers ADD COLUMN flavor TEXT NOT NULL DEFAULT 'vanilla'")
+	db.Exec("ALTER TABLE servers ADD COLUMN cpu_limit REAL DEFAULT 0")
+	db.Exec("ALTER TABLE servers ADD COLUMN memory_limit_mb INTEGER DEFAULT 0")
+	db.Exec("ALTER TABLE servers ADD COLUMN restart_schedule TEXT DEFAULT ''")
 
 	return db, nil
 }
@@ -73,7 +79,7 @@ func CreateServer(db *sql.DB, server *Server) error {
 }
 
 func GetServer(db *sql.DB, id string) (*Server, error) {
-	query := `SELECT id, name, version, flavor, port, status, created_at, last_started_at FROM servers WHERE id = ?`
+	query := `SELECT id, name, version, flavor, port, status, cpu_limit, memory_limit_mb, restart_schedule, created_at, last_started_at FROM servers WHERE id = ?`
 	server := &Server{}
 	err := db.QueryRow(query, id).Scan(
 		&server.ID,
@@ -82,6 +88,9 @@ func GetServer(db *sql.DB, id string) (*Server, error) {
 		&server.Flavor,
 		&server.Port,
 		&server.Status,
+		&server.CPULimit,
+		&server.MemoryLimitMB,
+		&server.RestartSchedule,
 		&server.CreatedAt,
 		&server.LastStartedAt,
 	)
@@ -92,7 +101,7 @@ func GetServer(db *sql.DB, id string) (*Server, error) {
 }
 
 func GetAllServers(db *sql.DB) ([]*Server, error) {
-	query := `SELECT id, name, version, flavor, port, status, created_at, last_started_at FROM servers ORDER BY created_at DESC`
+	query := `SELECT id, name, version, flavor, port, status, cpu_limit, memory_limit_mb, restart_schedule, created_at, last_started_at FROM servers ORDER BY created_at DESC`
 	rows, err := db.Query(query)
 	if err != nil {
 		return nil, err
@@ -109,6 +118,9 @@ func GetAllServers(db *sql.DB) ([]*Server, error) {
 			&server.Flavor,
 			&server.Port,
 			&server.Status,
+			&server.CPULimit,
+			&server.MemoryLimitMB,
+			&server.RestartSchedule,
 			&server.CreatedAt,
 			&server.LastStartedAt,
 		)
@@ -130,6 +142,18 @@ func UpdateServerStatus(db *sql.DB, id string, status string) error {
 func UpdateServerLastStarted(db *sql.DB, id string, timestamp time.Time) error {
 	query := `UPDATE servers SET last_started_at = ? WHERE id = ?`
 	_, err := db.Exec(query, timestamp, id)
+	return err
+}
+
+func UpdateRestartSchedule(db *sql.DB, id, schedule string) error {
+	query := `UPDATE servers SET restart_schedule = ? WHERE id = ?`
+	_, err := db.Exec(query, schedule, id)
+	return err
+}
+
+func UpdateServerLimits(db *sql.DB, id string, cpuLimit float64, memoryLimitMB int) error {
+	query := `UPDATE servers SET cpu_limit = ?, memory_limit_mb = ? WHERE id = ?`
+	_, err := db.Exec(query, cpuLimit, memoryLimitMB, id)
 	return err
 }
 

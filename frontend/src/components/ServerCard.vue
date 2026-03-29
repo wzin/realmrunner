@@ -105,6 +105,35 @@
 
       <button
         v-if="server.status === 'stopped'"
+        @click="$emit('limits', server)"
+        class="btn btn-secondary btn-sm"
+      >
+        Limits
+      </button>
+
+      <button
+        @click="$emit('files', server)"
+        class="btn btn-secondary btn-sm"
+      >
+        Config
+      </button>
+
+      <button
+        @click="$emit('players', server)"
+        class="btn btn-secondary btn-sm"
+      >
+        Players
+      </button>
+
+      <button
+        @click="$emit('backups', server)"
+        class="btn btn-secondary btn-sm"
+      >
+        Backups
+      </button>
+
+      <button
+        v-if="server.status === 'stopped'"
         @click="handleReset"
         class="btn btn-warning btn-sm"
         :disabled="loading"
@@ -135,7 +164,7 @@ const props = defineProps({
   }
 })
 
-const emit = defineEmits(['refresh', 'console', 'metrics', 'upgrade'])
+const emit = defineEmits(['refresh', 'console', 'metrics', 'upgrade', 'limits', 'files', 'players', 'backups'])
 
 const loading = ref(false)
 const error = ref('')

@@ -10,6 +10,7 @@ import (
 	"time"
 
 	"github.com/google/uuid"
+	"github.com/wzin/realmrunner/cgroup"
 	"github.com/wzin/realmrunner/config"
 	"github.com/wzin/realmrunner/metrics"
 	"github.com/wzin/realmrunner/minecraft"
@@ -21,16 +22,18 @@ type Manager struct {
 	processes map[string]*Process
 	collector *metrics.Collector
 	registry  *minecraft.Registry
+	cgroupMgr *cgroup.Manager
 	mu        sync.RWMutex
 }
 
-func NewManager(db *sql.DB, cfg *config.Config, collector *metrics.Collector, registry *minecraft.Registry) *Manager {
+func NewManager(db *sql.DB, cfg *config.Config, collector *metrics.Collector, registry *minecraft.Registry, cgroupMgr *cgroup.Manager) *Manager {
 	m := &Manager{
 		db:        db,
 		config:    cfg,
 		processes: make(map[string]*Process),
 		collector: collector,
 		registry:  registry,
+		cgroupMgr: cgroupMgr,
 	}
 
 	// Clean up orphaned server statuses on startup
@@ -163,6 +166,15 @@ func (m *Manager) StartServer(id string) error {
 	UpdateServerStatus(m.db, id, StatusRunning)
 	UpdateServerLastStarted(m.db, id, time.Now())
 
+	// Apply cgroup limits if configured
+	if m.cgroupMgr != nil && (server.CPULimit > 0 || server.MemoryLimitMB > 0) {
+		if err := m.cgroupMgr.CreateCgroup(id, server.CPULimit, server.MemoryLimitMB); err != nil {
+			log.Printf("Failed to create cgroup for %s: %v", id, err)
+		} else if err := m.cgroupMgr.AssignProcess(id, process.PID()); err != nil {
+			log.Printf("Failed to assign process to cgroup for %s: %v", id, err)
+		}
+	}
+
 	// Start metrics collection
 	if m.collector != nil {
 		m.collector.StartCollecting(id, process.PID(), server.Port)
@@ -179,6 +191,11 @@ func (m *Manager) monitorProcess(id string, process *Process) {
 		// Stop metrics collection
 		if m.collector != nil {
 			m.collector.StopCollecting(id)
+		}
+
+		// Remove cgroup
+		if m.cgroupMgr != nil {
+			m.cgroupMgr.RemoveCgroup(id)
 		}
 
 		// Process exited - update status
@@ -215,6 +232,11 @@ func (m *Manager) StopServer(id string) error {
 		// Stop metrics collection
 		if m.collector != nil {
 			m.collector.StopCollecting(id)
+		}
+
+		// Remove cgroup
+		if m.cgroupMgr != nil {
+			m.cgroupMgr.RemoveCgroup(id)
 		}
 
 		// Stop process
@@ -310,6 +332,21 @@ func (m *Manager) getServerDir(id string) string {
 
 func (m *Manager) GetServerDir(id string) string {
 	return m.getServerDir(id)
+}
+
+func (m *Manager) SetLimits(id string, cpuLimit float64, memoryLimitMB int) error {
+	srv, err := GetServer(m.db, id)
+	if err != nil {
+		return err
+	}
+	if srv.Status != StatusStopped {
+		return fmt.Errorf("server must be stopped to change limits")
+	}
+	return UpdateServerLimits(m.db, id, cpuLimit, memoryLimitMB)
+}
+
+func (m *Manager) SetRestartSchedule(id, schedule string) error {
+	return UpdateRestartSchedule(m.db, id, schedule)
 }
 
 func (m *Manager) GetRegistry() *minecraft.Registry {

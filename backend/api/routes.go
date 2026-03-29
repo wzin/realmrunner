@@ -36,8 +36,27 @@ func RegisterRoutes(
 	protected.DELETE("/servers/:id/wipeout", handlers.WipeoutServer)
 	protected.POST("/servers/:id/command", handlers.SendCommand)
 
-	// Server upgrade
+	// Server upgrade, limits, and files
 	protected.POST("/servers/:id/upgrade", handlers.UpgradeServer)
+	protected.PUT("/servers/:id/limits", handlers.SetLimits)
+	protected.PUT("/servers/:id/schedule", handlers.SetSchedule)
+	protected.GET("/servers/:id/files", handlers.ListFiles)
+	protected.GET("/servers/:id/files/*path", handlers.ReadFile)
+	protected.PUT("/servers/:id/files/*path", handlers.WriteFile)
+
+	// Backups
+	protected.GET("/servers/:id/backups", handlers.ListBackups)
+	protected.POST("/servers/:id/backups", handlers.CreateBackup)
+	protected.POST("/servers/:id/backups/:bid/restore", handlers.RestoreBackup)
+	protected.DELETE("/servers/:id/backups/:bid", handlers.DeleteBackup)
+
+	// Whitelist and ops
+	protected.GET("/servers/:id/whitelist", handlers.GetWhitelist)
+	protected.POST("/servers/:id/whitelist", handlers.AddToWhitelist)
+	protected.DELETE("/servers/:id/whitelist/:uuid", handlers.RemoveFromWhitelist)
+	protected.GET("/servers/:id/ops", handlers.GetOps)
+	protected.POST("/servers/:id/ops", handlers.AddOp)
+	protected.DELETE("/servers/:id/ops/:uuid", handlers.RemoveOp)
 
 	// Metrics endpoints
 	protected.GET("/servers/:id/metrics", handlers.GetServerMetrics)

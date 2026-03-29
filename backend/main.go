@@ -9,8 +9,11 @@ import (
 	"github.com/wzin/realmrunner/api"
 	"github.com/wzin/realmrunner/auth"
 	"github.com/wzin/realmrunner/config"
+	"github.com/wzin/realmrunner/backup"
+	"github.com/wzin/realmrunner/cgroup"
 	"github.com/wzin/realmrunner/metrics"
 	"github.com/wzin/realmrunner/minecraft"
+	"github.com/wzin/realmrunner/scheduler"
 	"github.com/wzin/realmrunner/server"
 	"github.com/wzin/realmrunner/websocket"
 )
@@ -34,14 +37,26 @@ func main() {
 		log.Fatalf("Failed to initialize metrics table: %v", err)
 	}
 
+	// Initialize backup table
+	if err := backup.InitBackupTable(db); err != nil {
+		log.Fatalf("Failed to initialize backup table: %v", err)
+	}
+
 	// Initialize metrics collector
 	collector := metrics.NewCollector(db)
 
 	// Initialize provider registry
 	registry := minecraft.NewRegistry()
 
+	// Initialize cgroup manager (graceful fallback if unavailable)
+	cgroupMgr := cgroup.NewManager()
+
 	// Initialize server manager
-	manager := server.NewManager(db, cfg, collector, registry)
+	manager := server.NewManager(db, cfg, collector, registry, cgroupMgr)
+
+	// Initialize scheduler
+	sched := scheduler.NewScheduler(db, manager)
+	sched.Start()
 
 	// Initialize WebSocket hub
 	hub := websocket.NewHub()

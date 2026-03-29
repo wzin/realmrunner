@@ -3,6 +3,7 @@ package api
 import (
 	"fmt"
 	"net/http"
+	"os"
 
 	"github.com/gin-gonic/gin"
 	"github.com/wzin/realmrunner/config"
@@ -38,6 +39,11 @@ type CreateServerRequest struct {
 type UpgradeServerRequest struct {
 	Version string `json:"version" binding:"required"`
 	Flavor  string `json:"flavor"`
+}
+
+type SetLimitsRequest struct {
+	CPULimit      float64 `json:"cpu_limit"`
+	MemoryLimitMB int     `json:"memory_limit_mb"`
 }
 
 type CommandRequest struct {
@@ -249,6 +255,145 @@ func (h *Handlers) HandleWebSocket(c *gin.Context) {
 	}
 
 	websocket.HandleConnection(c.Writer, c.Request, h.hub, h.manager, id)
+}
+
+// File editor endpoints
+
+func (h *Handlers) ListFiles(c *gin.Context) {
+	id := c.Param("id")
+	if _, err := h.manager.GetServer(id); err != nil {
+		c.JSON(http.StatusNotFound, gin.H{"error": "server not found"})
+		return
+	}
+
+	serverDir := h.manager.GetServerDir(id)
+	files, err := listEditableFiles(serverDir)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+	if files == nil {
+		files = []FileInfo{}
+	}
+	c.JSON(http.StatusOK, gin.H{"files": files})
+}
+
+func (h *Handlers) ReadFile(c *gin.Context) {
+	id := c.Param("id")
+	filePath := c.Param("path")
+	if filePath != "" && filePath[0] == '/' {
+		filePath = filePath[1:]
+	}
+
+	if _, err := h.manager.GetServer(id); err != nil {
+		c.JSON(http.StatusNotFound, gin.H{"error": "server not found"})
+		return
+	}
+
+	serverDir := h.manager.GetServerDir(id)
+	absPath, err := validateFilePath(serverDir, filePath)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+
+	data, err := os.ReadFile(absPath)
+	if err != nil {
+		c.JSON(http.StatusNotFound, gin.H{"error": "file not found"})
+		return
+	}
+
+	if len(data) > maxFileSize {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "file too large"})
+		return
+	}
+
+	c.JSON(http.StatusOK, gin.H{"content": string(data), "path": filePath})
+}
+
+func (h *Handlers) WriteFile(c *gin.Context) {
+	id := c.Param("id")
+	filePath := c.Param("path")
+	if filePath != "" && filePath[0] == '/' {
+		filePath = filePath[1:]
+	}
+
+	if _, err := h.manager.GetServer(id); err != nil {
+		c.JSON(http.StatusNotFound, gin.H{"error": "server not found"})
+		return
+	}
+
+	var req struct {
+		Content string `json:"content" binding:"required"`
+	}
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid request"})
+		return
+	}
+
+	if len(req.Content) > maxFileSize {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "content too large"})
+		return
+	}
+
+	serverDir := h.manager.GetServerDir(id)
+	absPath, err := validateFilePath(serverDir, filePath)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+
+	if err := os.WriteFile(absPath, []byte(req.Content), 0644); err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to write file"})
+		return
+	}
+
+	c.JSON(http.StatusOK, gin.H{"message": "file saved"})
+}
+
+// Schedule endpoint
+
+func (h *Handlers) SetSchedule(c *gin.Context) {
+	id := c.Param("id")
+	var req struct {
+		Schedule string `json:"schedule"`
+	}
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid request"})
+		return
+	}
+
+	if _, err := h.manager.GetServer(id); err != nil {
+		c.JSON(http.StatusNotFound, gin.H{"error": "server not found"})
+		return
+	}
+
+	if err := h.manager.SetRestartSchedule(id, req.Schedule); err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+
+	srv, _ := h.manager.GetServer(id)
+	c.JSON(http.StatusOK, h.makeServerResponse(srv))
+}
+
+// Limits endpoint
+
+func (h *Handlers) SetLimits(c *gin.Context) {
+	id := c.Param("id")
+	var req SetLimitsRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid request"})
+		return
+	}
+
+	if err := h.manager.SetLimits(id, req.CPULimit, req.MemoryLimitMB); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+
+	srv, _ := h.manager.GetServer(id)
+	c.JSON(http.StatusOK, h.makeServerResponse(srv))
 }
 
 // Metrics endpoints

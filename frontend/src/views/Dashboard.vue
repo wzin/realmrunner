@@ -46,6 +46,10 @@
           @console="openConsole"
           @metrics="openMetrics"
           @upgrade="openUpgrade"
+          @limits="openLimits"
+          @files="openFiles"
+          @players="openPlayers"
+          @backups="openBackups"
         />
       </div>
     </main>
@@ -74,6 +78,31 @@
       @close="upgradeServer = null"
       @upgraded="handleUpgraded"
     />
+
+    <LimitsModal
+      v-if="limitsServer"
+      :server="limitsServer"
+      @close="limitsServer = null"
+      @saved="handleLimitsSaved"
+    />
+
+    <FileEditorModal
+      v-if="filesServer"
+      :server="filesServer"
+      @close="filesServer = null"
+    />
+
+    <WhitelistModal
+      v-if="playersServer"
+      :server="playersServer"
+      @close="playersServer = null"
+    />
+
+    <BackupsModal
+      v-if="backupsServer"
+      :server="backupsServer"
+      @close="backupsServer = null"
+    />
   </div>
 </template>
 
@@ -86,6 +115,10 @@ import CreateModal from '../components/CreateModal.vue'
 import ConsoleModal from '../components/ConsoleModal.vue'
 import MetricsModal from '../components/MetricsModal.vue'
 import UpgradeModal from '../components/UpgradeModal.vue'
+import LimitsModal from '../components/LimitsModal.vue'
+import FileEditorModal from '../components/FileEditorModal.vue'
+import WhitelistModal from '../components/WhitelistModal.vue'
+import BackupsModal from '../components/BackupsModal.vue'
 import ThemeSwitcher from '../components/ThemeSwitcher.vue'
 
 const router = useRouter()
@@ -96,6 +129,10 @@ const showCreateModal = ref(false)
 const selectedServer = ref(null)
 const metricsServer = ref(null)
 const upgradeServer = ref(null)
+const limitsServer = ref(null)
+const filesServer = ref(null)
+const playersServer = ref(null)
+const backupsServer = ref(null)
 
 async function loadServers() {
   loading.value = true
@@ -134,6 +171,27 @@ function openUpgrade(server) {
 
 function handleUpgraded() {
   upgradeServer.value = null
+  loadServers()
+}
+
+function openLimits(server) {
+  limitsServer.value = server
+}
+
+function openBackups(server) {
+  backupsServer.value = server
+}
+
+function openPlayers(server) {
+  playersServer.value = server
+}
+
+function openFiles(server) {
+  filesServer.value = server
+}
+
+function handleLimitsSaved() {
+  limitsServer.value = null
   loadServers()
 }
 
