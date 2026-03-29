@@ -53,6 +53,10 @@ export const api = {
     body: JSON.stringify({ command }),
   }),
 
+  // Metrics
+  getMetrics: (id) => request(`/servers/${id}/metrics`),
+  getMetricsHistory: (id, range_) => request(`/servers/${id}/metrics/history?range=${range_}`),
+
   // Versions
   getVersions: () => request('/versions'),
 }

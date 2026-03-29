@@ -6,6 +6,7 @@ import (
 
 	"github.com/gin-gonic/gin"
 	"github.com/wzin/realmrunner/config"
+	"github.com/wzin/realmrunner/metrics"
 	"github.com/wzin/realmrunner/minecraft"
 	"github.com/wzin/realmrunner/server"
 	"github.com/wzin/realmrunner/websocket"
@@ -37,16 +38,41 @@ type CommandRequest struct {
 	Command string `json:"command" binding:"required"`
 }
 
+type LatestMetricsResponse struct {
+	CPUPercent  float64  `json:"cpu_percent"`
+	MemoryMB    float64  `json:"memory_mb"`
+	PlayerCount int      `json:"player_count"`
+	PlayerNames []string `json:"player_names"`
+}
+
 type ServerResponse struct {
 	*server.Server
-	ConnectionURL string `json:"connection_url"`
+	ConnectionURL string                 `json:"connection_url"`
+	Metrics       *LatestMetricsResponse `json:"metrics,omitempty"`
 }
 
 func (h *Handlers) makeServerResponse(srv *server.Server) *ServerResponse {
-	return &ServerResponse{
+	resp := &ServerResponse{
 		Server:        srv,
 		ConnectionURL: fmt.Sprintf("%s:%d", h.config.BaseURL, srv.Port),
 	}
+
+	// Include latest metrics if server is running
+	if srv.Status == server.StatusRunning {
+		collector := h.manager.GetCollector()
+		if collector != nil {
+			if latest := collector.GetLatest(srv.ID); latest != nil {
+				resp.Metrics = &LatestMetricsResponse{
+					CPUPercent:  latest.CPUPercent,
+					MemoryMB:    latest.MemoryMB,
+					PlayerCount: latest.PlayerCount,
+					PlayerNames: latest.PlayerNames,
+				}
+			}
+		}
+	}
+
+	return resp
 }
 
 func (h *Handlers) makeServerResponses(servers []*server.Server) []*ServerResponse {
@@ -174,4 +200,62 @@ func (h *Handlers) HandleWebSocket(c *gin.Context) {
 	}
 
 	websocket.HandleConnection(c.Writer, c.Request, h.hub, h.manager, id)
+}
+
+// Metrics endpoints
+
+func (h *Handlers) GetServerMetrics(c *gin.Context) {
+	id := c.Param("id")
+
+	// Verify server exists
+	_, err := h.manager.GetServer(id)
+	if err != nil {
+		c.JSON(http.StatusNotFound, gin.H{"error": "server not found"})
+		return
+	}
+
+	// Try in-memory cache first
+	collector := h.manager.GetCollector()
+	if collector != nil {
+		if latest := collector.GetLatest(id); latest != nil {
+			c.JSON(http.StatusOK, latest)
+			return
+		}
+	}
+
+	// Fall back to DB
+	db := h.manager.GetDB()
+	metric, err := metrics.GetLatestMetric(db, id)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+	if metric == nil {
+		c.JSON(http.StatusOK, gin.H{"cpu_percent": 0, "memory_mb": 0, "player_count": 0, "player_names": []string{}})
+		return
+	}
+	c.JSON(http.StatusOK, metric)
+}
+
+func (h *Handlers) GetServerMetricsHistory(c *gin.Context) {
+	id := c.Param("id")
+	rangeStr := c.DefaultQuery("range", "24h")
+
+	// Verify server exists
+	_, err := h.manager.GetServer(id)
+	if err != nil {
+		c.JSON(http.StatusNotFound, gin.H{"error": "server not found"})
+		return
+	}
+
+	db := h.manager.GetDB()
+	points, err := metrics.GetMetricsHistory(db, id, rangeStr)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+	if points == nil {
+		points = []metrics.MetricPoint{}
+	}
+	c.JSON(http.StatusOK, gin.H{"points": points})
 }

@@ -214,6 +214,14 @@ func (p *Process) TailLogs(serverDir string) (<-chan string, error) {
 	return ch, nil
 }
 
+// PID returns the process ID, or 0 if not running
+func (p *Process) PID() int {
+	if p.cmd != nil && p.cmd.Process != nil {
+		return p.cmd.Process.Pid
+	}
+	return 0
+}
+
 // ReadHistoricalLogs reads logs from the log file (for stopped servers)
 // Returns up to the last 10,000 lines to avoid overwhelming the browser
 func ReadHistoricalLogs(serverDir string) ([]string, error) {

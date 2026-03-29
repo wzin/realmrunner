@@ -25,6 +25,21 @@
       </div>
     </div>
 
+    <div v-if="server.metrics" class="metrics-row">
+      <div class="metric">
+        <span class="metric-label">CPU</span>
+        <span class="metric-value">{{ server.metrics.cpu_percent.toFixed(1) }}%</span>
+      </div>
+      <div class="metric">
+        <span class="metric-label">RAM</span>
+        <span class="metric-value">{{ server.metrics.memory_mb.toFixed(0) }} MB</span>
+      </div>
+      <div class="metric" :title="playerTooltip">
+        <span class="metric-label">Players</span>
+        <span class="metric-value">{{ server.metrics.player_count }}</span>
+      </div>
+    </div>
+
     <div v-if="error" class="alert alert-error">
       {{ error }}
     </div>
@@ -63,6 +78,13 @@
       </button>
 
       <button
+        @click="$emit('metrics', server)"
+        class="btn btn-secondary btn-sm"
+      >
+        Metrics
+      </button>
+
+      <button
         v-if="server.status === 'stopped'"
         @click="$emit('console', server)"
         class="btn btn-secondary btn-sm"
@@ -92,7 +114,7 @@
 </template>
 
 <script setup>
-import { ref } from 'vue'
+import { ref, computed } from 'vue'
 import { api } from '../api/client'
 
 const props = defineProps({
@@ -102,10 +124,17 @@ const props = defineProps({
   }
 })
 
-const emit = defineEmits(['refresh', 'console'])
+const emit = defineEmits(['refresh', 'console', 'metrics'])
 
 const loading = ref(false)
 const error = ref('')
+
+const playerTooltip = computed(() => {
+  if (props.server.metrics && props.server.metrics.player_names && props.server.metrics.player_names.length > 0) {
+    return props.server.metrics.player_names.join(', ')
+  }
+  return 'No players online'
+})
 
 async function handleStart() {
   loading.value = true
@@ -231,6 +260,36 @@ function formatDate(dateString) {
   background: var(--status-stopping-bg);
   color: var(--status-stopping-text);
   border-color: var(--status-stopping-bg);
+}
+
+.metrics-row {
+  display: flex;
+  gap: 1rem;
+  padding: 0.75rem;
+  background: var(--bg-input);
+  border: 2px solid var(--border);
+  border-radius: 2px;
+}
+
+.metric {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  flex: 1;
+}
+
+.metric-label {
+  font-family: 'Press Start 2P', monospace;
+  font-size: 0.4rem;
+  color: var(--text-muted);
+  text-transform: uppercase;
+  margin-bottom: 0.25rem;
+}
+
+.metric-value {
+  font-family: 'Press Start 2P', monospace;
+  font-size: 0.625rem;
+  color: var(--accent);
 }
 
 .server-info {

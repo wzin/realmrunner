@@ -9,6 +9,7 @@ import (
 	"github.com/wzin/realmrunner/api"
 	"github.com/wzin/realmrunner/auth"
 	"github.com/wzin/realmrunner/config"
+	"github.com/wzin/realmrunner/metrics"
 	"github.com/wzin/realmrunner/server"
 	"github.com/wzin/realmrunner/websocket"
 )
@@ -27,8 +28,16 @@ func main() {
 	}
 	defer db.Close()
 
+	// Initialize metrics table
+	if err := metrics.InitMetricsTable(db); err != nil {
+		log.Fatalf("Failed to initialize metrics table: %v", err)
+	}
+
+	// Initialize metrics collector
+	collector := metrics.NewCollector(db)
+
 	// Initialize server manager
-	manager := server.NewManager(db, cfg)
+	manager := server.NewManager(db, cfg, collector)
 
 	// Initialize WebSocket hub
 	hub := websocket.NewHub()

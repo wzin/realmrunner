@@ -44,6 +44,7 @@
           :server="server"
           @refresh="loadServers"
           @console="openConsole"
+          @metrics="openMetrics"
         />
       </div>
     </main>
@@ -59,6 +60,12 @@
       :server="selectedServer"
       @close="selectedServer = null"
     />
+
+    <MetricsModal
+      v-if="metricsServer"
+      :server="metricsServer"
+      @close="metricsServer = null"
+    />
   </div>
 </template>
 
@@ -69,6 +76,7 @@ import { api } from '../api/client'
 import ServerCard from '../components/ServerCard.vue'
 import CreateModal from '../components/CreateModal.vue'
 import ConsoleModal from '../components/ConsoleModal.vue'
+import MetricsModal from '../components/MetricsModal.vue'
 import ThemeSwitcher from '../components/ThemeSwitcher.vue'
 
 const router = useRouter()
@@ -77,6 +85,7 @@ const loading = ref(false)
 const error = ref('')
 const showCreateModal = ref(false)
 const selectedServer = ref(null)
+const metricsServer = ref(null)
 
 async function loadServers() {
   loading.value = true
@@ -103,6 +112,10 @@ function handleServerCreated() {
 
 function openConsole(server) {
   selectedServer.value = server
+}
+
+function openMetrics(server) {
+  metricsServer.value = server
 }
 
 onMounted(() => {

@@ -11,20 +11,23 @@ import (
 
 	"github.com/google/uuid"
 	"github.com/wzin/realmrunner/config"
+	"github.com/wzin/realmrunner/metrics"
 )
 
 type Manager struct {
 	db        *sql.DB
 	config    *config.Config
 	processes map[string]*Process
+	collector *metrics.Collector
 	mu        sync.RWMutex
 }
 
-func NewManager(db *sql.DB, cfg *config.Config) *Manager {
+func NewManager(db *sql.DB, cfg *config.Config, collector *metrics.Collector) *Manager {
 	m := &Manager{
 		db:        db,
 		config:    cfg,
 		processes: make(map[string]*Process),
+		collector: collector,
 	}
 
 	// Clean up orphaned server statuses on startup
@@ -140,6 +143,11 @@ func (m *Manager) StartServer(id string) error {
 	UpdateServerStatus(m.db, id, StatusRunning)
 	UpdateServerLastStarted(m.db, id, time.Now())
 
+	// Start metrics collection
+	if m.collector != nil {
+		m.collector.StartCollecting(id, process.PID(), server.Port)
+	}
+
 	return nil
 }
 
@@ -147,6 +155,11 @@ func (m *Manager) monitorProcess(id string, process *Process) {
 	// Wait for process to exit
 	if process.cmd != nil && process.cmd.Process != nil {
 		process.cmd.Wait()
+
+		// Stop metrics collection
+		if m.collector != nil {
+			m.collector.StopCollecting(id)
+		}
 
 		// Process exited - update status
 		m.mu.Lock()
@@ -179,6 +192,11 @@ func (m *Manager) StopServer(id string) error {
 	m.mu.RUnlock()
 
 	if exists {
+		// Stop metrics collection
+		if m.collector != nil {
+			m.collector.StopCollecting(id)
+		}
+
 		// Stop process
 		if err := process.Stop(); err != nil {
 			return fmt.Errorf("failed to stop server: %w", err)
@@ -272,4 +290,12 @@ func (m *Manager) getServerDir(id string) string {
 
 func (m *Manager) GetServerDir(id string) string {
 	return m.getServerDir(id)
+}
+
+func (m *Manager) GetCollector() *metrics.Collector {
+	return m.collector
+}
+
+func (m *Manager) GetDB() *sql.DB {
+	return m.db
 }
