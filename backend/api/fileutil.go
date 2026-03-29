@@ -87,11 +87,21 @@ func listEditableFiles(serverDir string) ([]FileInfo, error) {
 			return nil // skip errors
 		}
 
-		// Skip directories but still walk into them (max 2 levels deep)
 		rel, _ := filepath.Rel(serverDir, path)
 		depth := strings.Count(rel, string(os.PathSeparator))
+
+		// Skip large binary/data directories
 		if info.IsDir() {
-			if depth > 2 {
+			base := info.Name()
+			skipDirs := map[string]bool{
+				"world": true, "world_nether": true, "world_the_end": true,
+				"logs": true, "crash-reports": true, "libraries": true,
+				"versions": true, "cache": true, ".git": true,
+			}
+			if skipDirs[base] && depth == 0 {
+				return filepath.SkipDir
+			}
+			if depth > 20 {
 				return filepath.SkipDir
 			}
 			return nil
