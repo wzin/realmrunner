@@ -21,7 +21,7 @@ type Process struct {
 	mu     sync.Mutex
 }
 
-func StartProcess(serverDir string, port int, memoryMB int) (*Process, error) {
+func StartProcess(serverDir string, port int, command string, args []string) (*Process, error) {
 	// Check if server.jar exists
 	jarPath := filepath.Join(serverDir, "server.jar")
 	if _, err := os.Stat(jarPath); os.IsNotExist(err) {
@@ -44,13 +44,8 @@ func StartProcess(serverDir string, port int, memoryMB int) (*Process, error) {
 		}
 	}
 
-	// Start Java process
-	cmd := exec.Command("java",
-		fmt.Sprintf("-Xmx%dM", memoryMB),
-		fmt.Sprintf("-Xms%dM", memoryMB),
-		"-jar", "server.jar",
-		"nogui",
-	)
+	// Start process
+	cmd := exec.Command(command, args...)
 	cmd.Dir = serverDir
 
 	// Set up pipes

@@ -10,6 +10,7 @@ import (
 	"github.com/wzin/realmrunner/auth"
 	"github.com/wzin/realmrunner/config"
 	"github.com/wzin/realmrunner/metrics"
+	"github.com/wzin/realmrunner/minecraft"
 	"github.com/wzin/realmrunner/server"
 	"github.com/wzin/realmrunner/websocket"
 )
@@ -36,8 +37,11 @@ func main() {
 	// Initialize metrics collector
 	collector := metrics.NewCollector(db)
 
+	// Initialize provider registry
+	registry := minecraft.NewRegistry()
+
 	// Initialize server manager
-	manager := server.NewManager(db, cfg, collector)
+	manager := server.NewManager(db, cfg, collector, registry)
 
 	// Initialize WebSocket hub
 	hub := websocket.NewHub()

@@ -6,7 +6,7 @@ services:
     container_name: realmrunner
     restart: unless-stopped
     ports:
-      # - "8080:8080"  # Uncomment for local dev; in production traefik routes via labels
+      - "8080:8080"  # Local dev; comment out for production (traefik routes via labels)
       - "25565-25600:25565-25600"
     volumes:
       - ./data:/data

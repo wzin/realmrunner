@@ -36,12 +36,16 @@ func RegisterRoutes(
 	protected.DELETE("/servers/:id/wipeout", handlers.WipeoutServer)
 	protected.POST("/servers/:id/command", handlers.SendCommand)
 
+	// Server upgrade
+	protected.POST("/servers/:id/upgrade", handlers.UpgradeServer)
+
 	// Metrics endpoints
 	protected.GET("/servers/:id/metrics", handlers.GetServerMetrics)
 	protected.GET("/servers/:id/metrics/history", handlers.GetServerMetricsHistory)
 
-	// Version endpoints
+	// Version and flavor endpoints
 	protected.GET("/versions", handlers.GetVersions)
+	protected.GET("/flavors", handlers.GetFlavors)
 
 	// WebSocket endpoint
 	protected.GET("/ws/:id", handlers.HandleWebSocket)

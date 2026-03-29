@@ -22,19 +22,40 @@
         </div>
 
         <div class="form-group">
-          <label for="version" class="form-label">Minecraft Version</label>
+          <label for="flavor" class="form-label">Server Type</label>
           <select
-            id="version"
-            v-model="form.version"
+            id="flavor"
+            v-model="form.flavor"
             class="input"
-            required
-            :disabled="loading || loadingVersions"
+            :disabled="loading"
+            @change="onFlavorChange"
           >
-            <option value="">{{ loadingVersions ? 'Loading...' : 'Select version' }}</option>
-            <option v-for="version in versions" :key="version" :value="version">
-              {{ version }}
+            <option v-for="f in flavors" :key="f" :value="f">
+              {{ flavorLabels[f] || f }}
             </option>
           </select>
+        </div>
+
+        <div class="form-group">
+          <label for="version" class="form-label">Version</label>
+          <div class="version-row">
+            <select
+              id="version"
+              v-model="form.version"
+              class="input"
+              required
+              :disabled="loading || loadingVersions"
+            >
+              <option value="">{{ loadingVersions ? 'Loading...' : 'Select version' }}</option>
+              <option v-for="v in versions" :key="v.id || v" :value="v.id || v">
+                {{ v.id || v }}{{ v.type && v.type !== 'release' ? ` (${v.type})` : '' }}
+              </option>
+            </select>
+            <label v-if="form.flavor === 'vanilla'" class="snapshot-toggle">
+              <input type="checkbox" v-model="includeSnapshots" @change="loadVersions" />
+              <span class="toggle-label">All versions</span>
+            </label>
+          </div>
         </div>
 
         <div class="form-group">
@@ -85,6 +106,7 @@ const emit = defineEmits(['close', 'created'])
 
 const form = ref({
   name: '',
+  flavor: 'vanilla',
   version: '',
   port: null
 })
@@ -94,6 +116,13 @@ const servers = ref([])
 const loading = ref(false)
 const loadingVersions = ref(false)
 const error = ref('')
+const includeSnapshots = ref(false)
+const flavors = ref(['vanilla'])
+const flavorLabels = {
+  vanilla: 'Vanilla (Official Mojang)',
+  paper: 'Paper (Performance + Plugins)',
+  purpur: 'Purpur (Paper fork, extra features)',
+}
 
 const occupiedPorts = computed(() => {
   return servers.value.map(s => s.port).sort((a, b) => a - b)
@@ -101,27 +130,27 @@ const occupiedPorts = computed(() => {
 
 const portError = computed(() => {
   const port = form.value.port
-
-  if (!port) {
-    return ''
-  }
-
-  if (port < 1 || port > 65535) {
-    return 'Port must be between 1 and 65535'
-  }
-
-  if (occupiedPorts.value.includes(port)) {
-    return `Port ${port} is already in use by another server`
-  }
-
+  if (!port) return ''
+  if (port < 1 || port > 65535) return 'Port must be between 1 and 65535'
+  if (occupiedPorts.value.includes(port)) return `Port ${port} is already in use by another server`
   return ''
 })
+
+function onFlavorChange() {
+  form.value.version = ''
+  loadVersions()
+}
 
 async function loadVersions() {
   loadingVersions.value = true
   try {
-    const response = await api.getVersions()
-    versions.value = response.versions || []
+    const response = await api.getVersions(form.value.flavor, includeSnapshots.value)
+    // Use version_details if available, fall back to versions strings
+    if (response.version_details) {
+      versions.value = response.version_details
+    } else {
+      versions.value = (response.versions || []).map(v => ({ id: v, type: 'release' }))
+    }
   } catch (err) {
     error.value = 'Failed to load versions'
   } finally {
@@ -138,16 +167,13 @@ async function loadServers() {
 }
 
 async function handleCreate() {
-  // Check if there's a port error
-  if (portError.value) {
-    return
-  }
+  if (portError.value) return
 
   loading.value = true
   error.value = ''
 
   try {
-    await api.createServer(form.value.name, form.value.version, form.value.port)
+    await api.createServer(form.value.name, form.value.version, form.value.port, form.value.flavor)
     emit('created')
   } catch (err) {
     error.value = err.message || 'Failed to create server'
@@ -156,7 +182,17 @@ async function handleCreate() {
   }
 }
 
+async function loadFlavors() {
+  try {
+    const resp = await api.getFlavors()
+    flavors.value = resp.flavors || ['vanilla']
+  } catch (err) {
+    console.error('Failed to load flavors:', err)
+  }
+}
+
 onMounted(() => {
+  loadFlavors()
   loadVersions()
   loadServers()
 })
@@ -184,5 +220,32 @@ onMounted(() => {
   gap: 1rem;
   justify-content: flex-end;
   margin-top: 1.5rem;
+}
+
+.version-row {
+  display: flex;
+  gap: 0.75rem;
+  align-items: center;
+}
+
+.version-row .input {
+  flex: 1;
+}
+
+.snapshot-toggle {
+  display: flex;
+  align-items: center;
+  gap: 0.375rem;
+  white-space: nowrap;
+  cursor: pointer;
+}
+
+.snapshot-toggle input[type="checkbox"] {
+  accent-color: var(--accent);
+}
+
+.toggle-label {
+  font-size: 0.75rem;
+  color: var(--text-muted);
 }
 </style>

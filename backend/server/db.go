@@ -11,12 +11,13 @@ import (
 )
 
 type Server struct {
-	ID            string    `json:"id"`
-	Name          string    `json:"name"`
-	Version       string    `json:"version"`
-	Port          int       `json:"port"`
-	Status        string    `json:"status"`
-	CreatedAt     time.Time `json:"created_at"`
+	ID            string     `json:"id"`
+	Name          string     `json:"name"`
+	Version       string     `json:"version"`
+	Flavor        string     `json:"flavor"`
+	Port          int        `json:"port"`
+	Status        string     `json:"status"`
+	CreatedAt     time.Time  `json:"created_at"`
 	LastStartedAt *time.Time `json:"last_started_at,omitempty"`
 }
 
@@ -56,25 +57,29 @@ func InitDB(dataDir string) (*sql.DB, error) {
 		return nil, fmt.Errorf("failed to create schema: %w", err)
 	}
 
+	// Migration: add flavor column if missing
+	db.Exec("ALTER TABLE servers ADD COLUMN flavor TEXT NOT NULL DEFAULT 'vanilla'")
+
 	return db, nil
 }
 
 func CreateServer(db *sql.DB, server *Server) error {
 	query := `
-	INSERT INTO servers (id, name, version, port, status, created_at)
-	VALUES (?, ?, ?, ?, ?, ?)
+	INSERT INTO servers (id, name, version, flavor, port, status, created_at)
+	VALUES (?, ?, ?, ?, ?, ?, ?)
 	`
-	_, err := db.Exec(query, server.ID, server.Name, server.Version, server.Port, server.Status, server.CreatedAt)
+	_, err := db.Exec(query, server.ID, server.Name, server.Version, server.Flavor, server.Port, server.Status, server.CreatedAt)
 	return err
 }
 
 func GetServer(db *sql.DB, id string) (*Server, error) {
-	query := `SELECT id, name, version, port, status, created_at, last_started_at FROM servers WHERE id = ?`
+	query := `SELECT id, name, version, flavor, port, status, created_at, last_started_at FROM servers WHERE id = ?`
 	server := &Server{}
 	err := db.QueryRow(query, id).Scan(
 		&server.ID,
 		&server.Name,
 		&server.Version,
+		&server.Flavor,
 		&server.Port,
 		&server.Status,
 		&server.CreatedAt,
@@ -87,7 +92,7 @@ func GetServer(db *sql.DB, id string) (*Server, error) {
 }
 
 func GetAllServers(db *sql.DB) ([]*Server, error) {
-	query := `SELECT id, name, version, port, status, created_at, last_started_at FROM servers ORDER BY created_at DESC`
+	query := `SELECT id, name, version, flavor, port, status, created_at, last_started_at FROM servers ORDER BY created_at DESC`
 	rows, err := db.Query(query)
 	if err != nil {
 		return nil, err
@@ -101,6 +106,7 @@ func GetAllServers(db *sql.DB) ([]*Server, error) {
 			&server.ID,
 			&server.Name,
 			&server.Version,
+			&server.Flavor,
 			&server.Port,
 			&server.Status,
 			&server.CreatedAt,
@@ -124,6 +130,12 @@ func UpdateServerStatus(db *sql.DB, id string, status string) error {
 func UpdateServerLastStarted(db *sql.DB, id string, timestamp time.Time) error {
 	query := `UPDATE servers SET last_started_at = ? WHERE id = ?`
 	_, err := db.Exec(query, timestamp, id)
+	return err
+}
+
+func UpdateServerVersion(db *sql.DB, id, version, flavor string) error {
+	query := `UPDATE servers SET version = ?, flavor = ? WHERE id = ?`
+	_, err := db.Exec(query, version, flavor, id)
 	return err
 }
 

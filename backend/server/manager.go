@@ -12,6 +12,7 @@ import (
 	"github.com/google/uuid"
 	"github.com/wzin/realmrunner/config"
 	"github.com/wzin/realmrunner/metrics"
+	"github.com/wzin/realmrunner/minecraft"
 )
 
 type Manager struct {
@@ -19,15 +20,17 @@ type Manager struct {
 	config    *config.Config
 	processes map[string]*Process
 	collector *metrics.Collector
+	registry  *minecraft.Registry
 	mu        sync.RWMutex
 }
 
-func NewManager(db *sql.DB, cfg *config.Config, collector *metrics.Collector) *Manager {
+func NewManager(db *sql.DB, cfg *config.Config, collector *metrics.Collector, registry *minecraft.Registry) *Manager {
 	m := &Manager{
 		db:        db,
 		config:    cfg,
 		processes: make(map[string]*Process),
 		collector: collector,
+		registry:  registry,
 	}
 
 	// Clean up orphaned server statuses on startup
@@ -52,7 +55,10 @@ func (m *Manager) cleanupOrphanedStatuses() {
 	log.Printf("Startup cleanup: Reset %d orphaned server(s) to stopped status\n", rows)
 }
 
-func (m *Manager) CreateServer(name, version string, port int) (*Server, error) {
+func (m *Manager) CreateServer(name, version, flavor string, port int) (*Server, error) {
+	if flavor == "" {
+		flavor = "vanilla"
+	}
 	// Validate port
 	if !m.config.PortRange.Contains(port) {
 		return nil, fmt.Errorf("port %d is outside allowed range %d-%d", port, m.config.PortRange.Min, m.config.PortRange.Max)
@@ -72,6 +78,7 @@ func (m *Manager) CreateServer(name, version string, port int) (*Server, error) 
 		ID:        uuid.New().String(),
 		Name:      name,
 		Version:   version,
+		Flavor:    flavor,
 		Port:      port,
 		Status:    StatusStopped,
 		CreatedAt: time.Now(),
@@ -123,9 +130,22 @@ func (m *Manager) StartServer(id string) error {
 		return err
 	}
 
-	// Start process
+	// Get start command from provider
 	serverDir := m.getServerDir(id)
-	process, err := StartProcess(serverDir, server.Port, m.config.MemoryMB)
+	cmd := "java"
+	args := []string{
+		fmt.Sprintf("-Xmx%dM", m.config.MemoryMB),
+		fmt.Sprintf("-Xms%dM", m.config.MemoryMB),
+		"-jar", "server.jar", "nogui",
+	}
+	if m.registry != nil {
+		if provider, ok := m.registry.GetProvider(server.Flavor); ok {
+			cmd, args = provider.StartCommand(serverDir, m.config.MemoryMB)
+		}
+	}
+
+	// Start process
+	process, err := StartProcess(serverDir, server.Port, cmd, args)
 	if err != nil {
 		UpdateServerStatus(m.db, id, StatusStopped)
 		return fmt.Errorf("failed to start server: %w", err)
@@ -290,6 +310,45 @@ func (m *Manager) getServerDir(id string) string {
 
 func (m *Manager) GetServerDir(id string) string {
 	return m.getServerDir(id)
+}
+
+func (m *Manager) GetRegistry() *minecraft.Registry {
+	return m.registry
+}
+
+func (m *Manager) UpgradeServer(id, version, flavor string) error {
+	srv, err := GetServer(m.db, id)
+	if err != nil {
+		return err
+	}
+
+	if srv.Status != StatusStopped {
+		return fmt.Errorf("server must be stopped to upgrade")
+	}
+
+	if flavor == "" {
+		flavor = srv.Flavor
+	}
+
+	// Download new server jar
+	provider, ok := m.registry.GetProvider(flavor)
+	if !ok {
+		return fmt.Errorf("unknown server flavor: %s", flavor)
+	}
+
+	serverDir := m.getServerDir(id)
+
+	// Remove old server.jar
+	jarPath := filepath.Join(serverDir, "server.jar")
+	os.Remove(jarPath)
+
+	// Download new version
+	if err := provider.DownloadServer(serverDir, version); err != nil {
+		return fmt.Errorf("failed to download server: %w", err)
+	}
+
+	// Update DB
+	return UpdateServerVersion(m.db, id, version, flavor)
 }
 
 func (m *Manager) GetCollector() *metrics.Collector {

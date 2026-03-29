@@ -13,25 +13,31 @@ import (
 )
 
 type Handlers struct {
-	manager        *server.Manager
-	hub            *websocket.Hub
-	config         *config.Config
-	versionFetcher *minecraft.VersionFetcher
+	manager  *server.Manager
+	hub      *websocket.Hub
+	config   *config.Config
+	registry *minecraft.Registry
 }
 
 func NewHandlers(manager *server.Manager, hub *websocket.Hub, cfg *config.Config) *Handlers {
 	return &Handlers{
-		manager:        manager,
-		hub:            hub,
-		config:         cfg,
-		versionFetcher: minecraft.NewVersionFetcher(),
+		manager:  manager,
+		hub:      hub,
+		config:   cfg,
+		registry: manager.GetRegistry(),
 	}
 }
 
 type CreateServerRequest struct {
 	Name    string `json:"name" binding:"required"`
 	Version string `json:"version" binding:"required"`
+	Flavor  string `json:"flavor"`
 	Port    int    `json:"port" binding:"required"`
+}
+
+type UpgradeServerRequest struct {
+	Version string `json:"version" binding:"required"`
+	Flavor  string `json:"flavor"`
 }
 
 type CommandRequest struct {
@@ -99,8 +105,13 @@ func (h *Handlers) CreateServer(c *gin.Context) {
 		return
 	}
 
+	flavor := req.Flavor
+	if flavor == "" {
+		flavor = "vanilla"
+	}
+
 	// Create server record
-	srv, err := h.manager.CreateServer(req.Name, req.Version, req.Port)
+	srv, err := h.manager.CreateServer(req.Name, req.Version, flavor, req.Port)
 	if err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 		return
@@ -108,11 +119,12 @@ func (h *Handlers) CreateServer(c *gin.Context) {
 
 	// Download and setup server in background
 	go func() {
-		if err := minecraft.DownloadServer(h.config.DataDir, srv.ID, req.Version); err != nil {
-			// Log error but don't fail the request
-			// The user will see the error when they try to start the server
+		provider, ok := h.registry.GetProvider(flavor)
+		if !ok {
 			return
 		}
+		serverDir := h.manager.GetServerDir(srv.ID)
+		provider.DownloadServer(serverDir, req.Version)
 	}()
 
 	c.JSON(http.StatusCreated, h.makeServerResponse(srv))
@@ -181,12 +193,49 @@ func (h *Handlers) SendCommand(c *gin.Context) {
 }
 
 func (h *Handlers) GetVersions(c *gin.Context) {
-	versions, err := h.versionFetcher.GetVersions()
+	flavor := c.DefaultQuery("flavor", "vanilla")
+	includeSnapshots := c.Query("include_snapshots") == "true"
+
+	provider, ok := h.registry.GetProvider(flavor)
+	if !ok {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "unknown flavor: " + flavor})
+		return
+	}
+
+	versions, err := provider.GetVersions(includeSnapshots)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
 	}
-	c.JSON(http.StatusOK, gin.H{"versions": versions})
+
+	// For backward compatibility, also return flat string list
+	ids := make([]string, len(versions))
+	for i, v := range versions {
+		ids[i] = v.ID
+	}
+
+	c.JSON(http.StatusOK, gin.H{"versions": ids, "version_details": versions})
+}
+
+func (h *Handlers) GetFlavors(c *gin.Context) {
+	c.JSON(http.StatusOK, gin.H{"flavors": h.registry.GetAllFlavors()})
+}
+
+func (h *Handlers) UpgradeServer(c *gin.Context) {
+	id := c.Param("id")
+	var req UpgradeServerRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid request"})
+		return
+	}
+
+	if err := h.manager.UpgradeServer(id, req.Version, req.Flavor); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+
+	srv, _ := h.manager.GetServer(id)
+	c.JSON(http.StatusOK, h.makeServerResponse(srv))
 }
 
 func (h *Handlers) HandleWebSocket(c *gin.Context) {

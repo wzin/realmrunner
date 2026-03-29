@@ -40,9 +40,13 @@ export const api = {
   // Servers
   getServers: () => request('/servers'),
   getServer: (id) => request(`/servers/${id}`),
-  createServer: (name, version, port) => request('/servers', {
+  createServer: (name, version, port, flavor) => request('/servers', {
     method: 'POST',
-    body: JSON.stringify({ name, version, port }),
+    body: JSON.stringify({ name, version, port, flavor: flavor || 'vanilla' }),
+  }),
+  upgradeServer: (id, version, flavor) => request(`/servers/${id}/upgrade`, {
+    method: 'POST',
+    body: JSON.stringify({ version, flavor }),
   }),
   startServer: (id) => request(`/servers/${id}/start`, { method: 'POST' }),
   stopServer: (id) => request(`/servers/${id}/stop`, { method: 'POST' }),
@@ -57,8 +61,14 @@ export const api = {
   getMetrics: (id) => request(`/servers/${id}/metrics`),
   getMetricsHistory: (id, range_) => request(`/servers/${id}/metrics/history?range=${range_}`),
 
-  // Versions
-  getVersions: () => request('/versions'),
+  // Versions & Flavors
+  getVersions: (flavor, includeSnapshots) => {
+    const params = new URLSearchParams()
+    if (flavor) params.set('flavor', flavor)
+    if (includeSnapshots) params.set('include_snapshots', 'true')
+    return request(`/versions?${params}`)
+  },
+  getFlavors: () => request('/flavors'),
 }
 
 export function createWebSocket(serverId) {

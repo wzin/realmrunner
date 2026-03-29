@@ -45,6 +45,7 @@
           @refresh="loadServers"
           @console="openConsole"
           @metrics="openMetrics"
+          @upgrade="openUpgrade"
         />
       </div>
     </main>
@@ -66,6 +67,13 @@
       :server="metricsServer"
       @close="metricsServer = null"
     />
+
+    <UpgradeModal
+      v-if="upgradeServer"
+      :server="upgradeServer"
+      @close="upgradeServer = null"
+      @upgraded="handleUpgraded"
+    />
   </div>
 </template>
 
@@ -77,6 +85,7 @@ import ServerCard from '../components/ServerCard.vue'
 import CreateModal from '../components/CreateModal.vue'
 import ConsoleModal from '../components/ConsoleModal.vue'
 import MetricsModal from '../components/MetricsModal.vue'
+import UpgradeModal from '../components/UpgradeModal.vue'
 import ThemeSwitcher from '../components/ThemeSwitcher.vue'
 
 const router = useRouter()
@@ -86,6 +95,7 @@ const error = ref('')
 const showCreateModal = ref(false)
 const selectedServer = ref(null)
 const metricsServer = ref(null)
+const upgradeServer = ref(null)
 
 async function loadServers() {
   loading.value = true
@@ -116,6 +126,15 @@ function openConsole(server) {
 
 function openMetrics(server) {
   metricsServer.value = server
+}
+
+function openUpgrade(server) {
+  upgradeServer.value = server
+}
+
+function handleUpgraded() {
+  upgradeServer.value = null
+  loadServers()
 }
 
 onMounted(() => {

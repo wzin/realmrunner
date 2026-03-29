@@ -3,7 +3,10 @@
     <div class="server-header">
       <div>
         <h3 class="server-name pixel-font">{{ server.name }}</h3>
-        <p class="server-version">Version: {{ server.version }}</p>
+        <p class="server-version">
+          <span class="flavor-badge">{{ server.flavor || 'vanilla' }}</span>
+          {{ server.version }}
+        </p>
       </div>
       <span :class="['status-badge pixel-font', `status-${server.status}`]">
         {{ server.status }}
@@ -94,6 +97,14 @@
 
       <button
         v-if="server.status === 'stopped'"
+        @click="$emit('upgrade', server)"
+        class="btn btn-secondary btn-sm"
+      >
+        Upgrade
+      </button>
+
+      <button
+        v-if="server.status === 'stopped'"
         @click="handleReset"
         class="btn btn-warning btn-sm"
         :disabled="loading"
@@ -124,7 +135,7 @@ const props = defineProps({
   }
 })
 
-const emit = defineEmits(['refresh', 'console', 'metrics'])
+const emit = defineEmits(['refresh', 'console', 'metrics', 'upgrade'])
 
 const loading = ref(false)
 const error = ref('')
@@ -228,6 +239,19 @@ function formatDate(dateString) {
 .server-version {
   color: var(--text-muted);
   font-size: 0.875rem;
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.flavor-badge {
+  font-family: 'Press Start 2P', monospace;
+  font-size: 0.4rem;
+  background: var(--accent);
+  color: var(--accent-text);
+  padding: 0.125rem 0.375rem;
+  border-radius: 2px;
+  text-transform: uppercase;
 }
 
 .status-badge {
