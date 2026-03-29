@@ -171,6 +171,15 @@ func (h *Handlers) StopServer(c *gin.Context) {
 	c.JSON(http.StatusOK, gin.H{"message": "server stopped"})
 }
 
+func (h *Handlers) ForceStopServer(c *gin.Context) {
+	id := c.Param("id")
+	if err := h.manager.ForceStopServer(id); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+	c.JSON(http.StatusOK, gin.H{"message": "server force stopped"})
+}
+
 func (h *Handlers) ResetServer(c *gin.Context) {
 	id := c.Param("id")
 	if err := h.manager.ResetServer(id); err != nil {

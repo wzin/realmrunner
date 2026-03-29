@@ -112,6 +112,14 @@ func (p *Process) Stop() error {
 	return nil
 }
 
+func (p *Process) ForceKill() {
+	p.mu.Lock()
+	defer p.mu.Unlock()
+	if p.cmd != nil && p.cmd.Process != nil {
+		p.cmd.Process.Signal(syscall.SIGKILL)
+	}
+}
+
 func (p *Process) SendCommand(command string) error {
 	p.mu.Lock()
 	defer p.mu.Unlock()

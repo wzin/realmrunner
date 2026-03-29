@@ -47,139 +47,50 @@
       {{ error }}
     </div>
 
-    <div class="server-actions">
-      <button
-        v-if="server.status === 'stopped' && server.ready"
-        @click="handleStart"
-        class="btn btn-success btn-sm"
-        :disabled="loading"
-      >
-        Start
-      </button>
-      <button
-        v-else-if="server.status === 'stopped' && !server.ready && isStaleDownload"
-        @click="handleStart"
-        class="btn btn-warning btn-sm"
-        :disabled="loading"
-        title="Download may have failed. Try starting anyway."
-      >
-        Retry Start
-      </button>
-      <button
-        v-else-if="server.status === 'stopped' && !server.ready"
-        class="btn btn-secondary btn-sm"
-        disabled
-      >
-        Downloading...
-      </button>
-      <button
-        v-else-if="server.status === 'running'"
-        @click="handleStop"
-        class="btn btn-danger btn-sm"
-        :disabled="loading"
-      >
-        Stop
-      </button>
-      <button
-        v-else
-        class="btn btn-secondary btn-sm"
-        disabled
-      >
-        {{ server.status }}
-      </button>
+    <!-- Power Controls -->
+    <div class="action-section">
+      <span class="section-label pixel-font">Power</span>
+      <div class="action-buttons">
+        <button v-if="server.status === 'stopped' && server.ready" @click="handleStart" class="btn btn-success btn-sm" :disabled="loading">Start</button>
+        <button v-else-if="server.status === 'stopped' && !server.ready && isStaleDownload" @click="handleStart" class="btn btn-warning btn-sm" :disabled="loading" title="Download may have failed">Retry Start</button>
+        <button v-else-if="server.status === 'stopped' && !server.ready" class="btn btn-secondary btn-sm" disabled>Downloading...</button>
+        <button v-if="server.status === 'running'" @click="handleStop" class="btn btn-danger btn-sm" :disabled="loading">Stop</button>
+        <button v-if="server.status === 'running' || server.status === 'stopping'" @click="handleForceStop" class="btn btn-danger btn-sm" :disabled="loading" title="Force kill the process immediately">Force Kill</button>
+        <button v-if="server.status === 'starting' || server.status === 'stopping'" class="btn btn-secondary btn-sm" disabled>{{ server.status }}...</button>
+      </div>
+    </div>
 
-      <button
-        v-if="server.status === 'running'"
-        @click="$emit('console', server)"
-        class="btn btn-primary btn-sm"
-      >
-        Console
-      </button>
+    <!-- Console & Monitoring -->
+    <div class="action-section">
+      <span class="section-label pixel-font">Monitor</span>
+      <div class="action-buttons">
+        <button v-if="server.status === 'running'" @click="$emit('console', server)" class="btn btn-primary btn-sm">Console</button>
+        <button v-if="server.status === 'stopped'" @click="$emit('console', server)" class="btn btn-secondary btn-sm">View Logs</button>
+        <button @click="$emit('metrics', server)" class="btn btn-secondary btn-sm">Metrics</button>
+      </div>
+    </div>
 
-      <button
-        @click="$emit('metrics', server)"
-        class="btn btn-secondary btn-sm"
-      >
-        Metrics
-      </button>
+    <!-- Configuration -->
+    <div class="action-section">
+      <span class="section-label pixel-font">Configure</span>
+      <div class="action-buttons">
+        <button @click="$emit('files', server)" class="btn btn-secondary btn-sm">Config</button>
+        <button @click="$emit('players', server)" class="btn btn-secondary btn-sm">Players</button>
+        <button @click="$emit('schedule', server)" class="btn btn-secondary btn-sm">Schedule</button>
+        <button v-if="server.status === 'stopped'" @click="$emit('limits', server)" class="btn btn-secondary btn-sm">Limits</button>
+        <button v-if="server.status === 'stopped'" @click="$emit('upgrade', server)" class="btn btn-secondary btn-sm">Upgrade</button>
+        <button v-if="server.flavor && server.flavor !== 'vanilla'" @click="$emit('mods', server)" class="btn btn-secondary btn-sm">Mods</button>
+      </div>
+    </div>
 
-      <button
-        v-if="server.status === 'stopped'"
-        @click="$emit('console', server)"
-        class="btn btn-secondary btn-sm"
-      >
-        View Logs
-      </button>
-
-      <button
-        v-if="server.status === 'stopped'"
-        @click="$emit('upgrade', server)"
-        class="btn btn-secondary btn-sm"
-      >
-        Upgrade
-      </button>
-
-      <button
-        v-if="server.status === 'stopped'"
-        @click="$emit('limits', server)"
-        class="btn btn-secondary btn-sm"
-      >
-        Limits
-      </button>
-
-      <button
-        @click="$emit('files', server)"
-        class="btn btn-secondary btn-sm"
-      >
-        Config
-      </button>
-
-      <button
-        @click="$emit('players', server)"
-        class="btn btn-secondary btn-sm"
-      >
-        Players
-      </button>
-
-      <button
-        @click="$emit('backups', server)"
-        class="btn btn-secondary btn-sm"
-      >
-        Backups
-      </button>
-
-      <button
-        @click="$emit('schedule', server)"
-        class="btn btn-secondary btn-sm"
-      >
-        Schedule
-      </button>
-
-      <button
-        v-if="server.flavor && server.flavor !== 'vanilla'"
-        @click="$emit('mods', server)"
-        class="btn btn-secondary btn-sm"
-      >
-        Mods
-      </button>
-
-      <button
-        v-if="server.status === 'stopped'"
-        @click="handleReset"
-        class="btn btn-warning btn-sm"
-        :disabled="loading"
-      >
-        Reset
-      </button>
-
-      <button
-        v-if="server.status === 'stopped'"
-        @click="handleDelete"
-        class="btn btn-danger btn-sm"
-        :disabled="loading"
-      >
-        Delete
-      </button>
+    <!-- Data Management -->
+    <div class="action-section">
+      <span class="section-label pixel-font">Data</span>
+      <div class="action-buttons">
+        <button @click="$emit('backups', server)" class="btn btn-secondary btn-sm">Backups</button>
+        <button v-if="server.status === 'stopped'" @click="handleReset" class="btn btn-warning btn-sm" :disabled="loading">Reset World</button>
+        <button v-if="server.status === 'stopped'" @click="handleDelete" class="btn btn-danger btn-sm" :disabled="loading">Delete Server</button>
+      </div>
     </div>
   </div>
 </template>
@@ -279,6 +190,20 @@ async function handleStop() {
     emit('refresh')
   } catch (err) {
     error.value = err.message || 'Failed to stop server'
+  } finally {
+    loading.value = false
+  }
+}
+
+async function handleForceStop() {
+  if (!confirm(`Force kill "${props.server.name}"? This will immediately terminate the process without saving!`)) return
+  loading.value = true
+  error.value = ''
+  try {
+    await api.forceStopServer(props.server.id)
+    emit('refresh')
+  } catch (err) {
+    error.value = err.message || 'Failed to force stop server'
   } finally {
     loading.value = false
   }
@@ -450,10 +375,33 @@ function formatDate(dateString) {
   color: var(--accent);
 }
 
-.server-actions {
+.action-section {
   display: flex;
+  align-items: flex-start;
   gap: 0.5rem;
+  padding-top: 0.5rem;
+  border-top: 1px solid var(--border);
+}
+
+.action-section:first-of-type {
+  border-top: none;
+  padding-top: 0;
+}
+
+.section-label {
+  font-size: 0.35rem;
+  color: var(--text-muted);
+  text-transform: uppercase;
+  min-width: 4.5rem;
+  padding-top: 0.375rem;
+  flex-shrink: 0;
+}
+
+.action-buttons {
+  display: flex;
+  gap: 0.375rem;
   flex-wrap: wrap;
+  flex: 1;
 }
 
 .btn-sm {

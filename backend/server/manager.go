@@ -290,6 +290,39 @@ func (m *Manager) StopServer(id string) error {
 	return nil
 }
 
+func (m *Manager) ForceStopServer(id string) error {
+	server, err := GetServer(m.db, id)
+	if err != nil {
+		return err
+	}
+
+	if server.Status != StatusRunning && server.Status != StatusStarting && server.Status != StatusStopping {
+		return fmt.Errorf("server is not running")
+	}
+
+	m.mu.RLock()
+	process, exists := m.processes[id]
+	m.mu.RUnlock()
+
+	if exists {
+		if m.collector != nil {
+			m.collector.StopCollecting(id)
+		}
+		if m.cgroupMgr != nil {
+			m.cgroupMgr.RemoveCgroup(id)
+		}
+
+		process.ForceKill()
+
+		m.mu.Lock()
+		delete(m.processes, id)
+		m.mu.Unlock()
+	}
+
+	UpdateServerStatus(m.db, id, StatusStopped)
+	return nil
+}
+
 func (m *Manager) ResetServer(id string) error {
 	server, err := GetServer(m.db, id)
 	if err != nil {
