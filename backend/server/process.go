@@ -87,30 +87,27 @@ func (p *Process) Stop() error {
 	defer p.mu.Unlock()
 
 	if p.cmd == nil || p.cmd.Process == nil {
-		return fmt.Errorf("process not running")
+		return nil // Already stopped
 	}
 
 	// Send "stop" command to Minecraft server
 	p.stdin.Write([]byte("stop\n"))
 
-	// Wait for graceful shutdown (30 seconds)
-	done := make(chan error, 1)
-	go func() {
-		done <- p.cmd.Wait()
-	}()
-
-	select {
-	case <-time.After(30 * time.Second):
-		// Force kill if not stopped gracefully
-		if err := p.cmd.Process.Signal(syscall.SIGKILL); err != nil {
-			return fmt.Errorf("failed to kill process: %w", err)
+	// Wait for process to exit (the monitorProcess goroutine handles cmd.Wait)
+	// We just poll for the process to disappear
+	pid := p.cmd.Process.Pid
+	for i := 0; i < 300; i++ { // 30 seconds (100ms intervals)
+		// Check if process still exists
+		if err := p.cmd.Process.Signal(syscall.Signal(0)); err != nil {
+			return nil // Process is gone
 		}
-		<-done // Wait for process to actually die
-	case err := <-done:
-		if err != nil && err.Error() != "signal: killed" {
-			return fmt.Errorf("process exited with error: %w", err)
-		}
+		time.Sleep(100 * time.Millisecond)
 	}
+
+	// Force kill if still running after 30s
+	log.Printf("Force killing server process %d after 30s timeout", pid)
+	p.cmd.Process.Signal(syscall.SIGKILL)
+	time.Sleep(1 * time.Second)
 
 	return nil
 }
