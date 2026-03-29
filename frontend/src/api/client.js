@@ -52,6 +52,10 @@ export const api = {
     method: 'POST',
     body: JSON.stringify({ name, version, port, flavor: flavor || 'vanilla' }),
   }),
+  setSchedule: (id, schedule) => request(`/servers/${id}/schedule`, {
+    method: 'PUT',
+    body: JSON.stringify({ schedule }),
+  }),
   setLimits: (id, cpuLimit, memoryLimitMB) => request(`/servers/${id}/limits`, {
     method: 'PUT',
     body: JSON.stringify({ cpu_limit: cpuLimit, memory_limit_mb: memoryLimitMB }),

@@ -10,6 +10,7 @@
           <div class="header-right">
             <ThemeSwitcher />
             <router-link v-if="isOwner" to="/admin" class="btn btn-secondary">Admin</router-link>
+            <button @click="showPasswordModal = true" class="btn btn-secondary">Password</button>
             <button @click="handleLogout" class="btn btn-secondary">Logout</button>
           </div>
         </div>
@@ -52,6 +53,7 @@
           @players="openPlayers"
           @backups="openBackups"
           @mods="openMods"
+          @schedule="openSchedule"
         />
       </div>
     </main>
@@ -106,6 +108,29 @@
       @close="backupsServer = null"
     />
 
+    <div v-if="showPasswordModal" class="modal-overlay" @click.self="showPasswordModal = false">
+      <div class="modal">
+        <div class="modal-header pixel-font">Change Password</div>
+        <div v-if="passwordError" class="alert alert-error">{{ passwordError }}</div>
+        <div v-if="passwordSaved" class="alert alert-success">Password changed</div>
+        <div class="form-group">
+          <label class="form-label">New Password</label>
+          <input v-model="newPassword" type="password" class="input" placeholder="New password" @keyup.enter="handleChangePassword" />
+        </div>
+        <div style="display:flex;gap:1rem;justify-content:flex-end;margin-top:1rem">
+          <button @click="showPasswordModal = false" class="btn btn-secondary">Cancel</button>
+          <button @click="handleChangePassword" class="btn btn-primary">Save</button>
+        </div>
+      </div>
+    </div>
+
+    <ScheduleModal
+      v-if="scheduleServer"
+      :server="scheduleServer"
+      @close="scheduleServer = null"
+      @saved="scheduleServer = null; loadServers()"
+    />
+
     <ModsModal
       v-if="modsServer"
       :server="modsServer"
@@ -128,6 +153,7 @@ import FileEditorModal from '../components/FileEditorModal.vue'
 import WhitelistModal from '../components/WhitelistModal.vue'
 import BackupsModal from '../components/BackupsModal.vue'
 import ModsModal from '../components/ModsModal.vue'
+import ScheduleModal from '../components/ScheduleModal.vue'
 import ThemeSwitcher from '../components/ThemeSwitcher.vue'
 
 const router = useRouter()
@@ -136,6 +162,10 @@ const servers = ref([])
 const loading = ref(false)
 const error = ref('')
 const showCreateModal = ref(false)
+const showPasswordModal = ref(false)
+const newPassword = ref('')
+const passwordError = ref('')
+const passwordSaved = ref(false)
 const selectedServer = ref(null)
 const metricsServer = ref(null)
 const upgradeServer = ref(null)
@@ -144,6 +174,7 @@ const filesServer = ref(null)
 const playersServer = ref(null)
 const backupsServer = ref(null)
 const modsServer = ref(null)
+const scheduleServer = ref(null)
 
 async function loadServers() {
   loading.value = true
@@ -155,6 +186,23 @@ async function loadServers() {
     error.value = err.message || 'Failed to load servers'
   } finally {
     loading.value = false
+  }
+}
+
+async function handleChangePassword() {
+  passwordError.value = ''
+  passwordSaved.value = false
+  if (!newPassword.value || newPassword.value.length < 4) {
+    passwordError.value = 'Password must be at least 4 characters'
+    return
+  }
+  try {
+    await api.changePassword(newPassword.value)
+    passwordSaved.value = true
+    newPassword.value = ''
+    setTimeout(() => { showPasswordModal.value = false; passwordSaved.value = false }, 1500)
+  } catch (err) {
+    passwordError.value = err.message || 'Failed to change password'
   }
 }
 
@@ -187,6 +235,10 @@ function handleUpgraded() {
 
 function openLimits(server) {
   limitsServer.value = server
+}
+
+function openSchedule(server) {
+  scheduleServer.value = server
 }
 
 function openMods(server) {

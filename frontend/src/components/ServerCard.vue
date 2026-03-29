@@ -134,6 +134,13 @@
       </button>
 
       <button
+        @click="$emit('schedule', server)"
+        class="btn btn-secondary btn-sm"
+      >
+        Schedule
+      </button>
+
+      <button
         v-if="server.flavor && server.flavor !== 'vanilla'"
         @click="$emit('mods', server)"
         class="btn btn-secondary btn-sm"
@@ -173,7 +180,7 @@ const props = defineProps({
   }
 })
 
-const emit = defineEmits(['refresh', 'console', 'metrics', 'upgrade', 'limits', 'files', 'players', 'backups', 'mods'])
+const emit = defineEmits(['refresh', 'console', 'metrics', 'upgrade', 'limits', 'files', 'players', 'backups', 'mods', 'schedule'])
 
 const loading = ref(false)
 const error = ref('')
