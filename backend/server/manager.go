@@ -62,20 +62,29 @@ func (m *Manager) cleanupOrphanedStatuses() {
 }
 
 func (m *Manager) fixReadyFlags() {
+	// Collect IDs first, then update (avoid SQLite lock from open rows)
 	rows, err := m.db.Query("SELECT id FROM servers WHERE ready = 0")
 	if err != nil {
 		return
 	}
-	defer rows.Close()
 
-	fixed := 0
+	var ids []string
 	for rows.Next() {
 		var id string
 		rows.Scan(&id)
+		ids = append(ids, id)
+	}
+	rows.Close()
+
+	fixed := 0
+	for _, id := range ids {
 		jarPath := filepath.Join(m.getServerDir(id), "server.jar")
 		if _, err := os.Stat(jarPath); err == nil {
-			SetServerReady(m.db, id, true)
-			fixed++
+			if _, err := m.db.Exec("UPDATE servers SET ready = 1 WHERE id = ?", id); err != nil {
+				log.Printf("Failed to set ready for %s: %v", id, err)
+			} else {
+				fixed++
+			}
 		}
 	}
 	if fixed > 0 {
