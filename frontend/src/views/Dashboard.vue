@@ -4,10 +4,13 @@
       <div class="container">
         <div class="header-content">
           <div>
-            <h1 class="title">RealmRunner</h1>
+            <h1 class="title pixel-font">RealmRunner</h1>
             <p class="subtitle">Minecraft Server Manager</p>
           </div>
-          <button @click="handleLogout" class="btn btn-secondary">Logout</button>
+          <div class="header-right">
+            <ThemeSwitcher />
+            <button @click="handleLogout" class="btn btn-secondary">Logout</button>
+          </div>
         </div>
       </div>
     </header>
@@ -66,6 +69,7 @@ import { api } from '../api/client'
 import ServerCard from '../components/ServerCard.vue'
 import CreateModal from '../components/CreateModal.vue'
 import ConsoleModal from '../components/ConsoleModal.vue'
+import ThemeSwitcher from '../components/ThemeSwitcher.vue'
 
 const router = useRouter()
 const servers = ref([])
@@ -110,10 +114,11 @@ onMounted(() => {
 
 <style scoped>
 .header {
-  background: #1e293b;
-  border-bottom: 1px solid #334155;
+  background: var(--bg-header);
+  border-bottom: 2px solid var(--border);
   padding: 1.5rem 0;
   margin-bottom: 2rem;
+  box-shadow: 0 2px 0 var(--border-shadow);
 }
 
 .header-content {
@@ -122,15 +127,22 @@ onMounted(() => {
   align-items: center;
 }
 
+.header-right {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+}
+
 .title {
-  font-size: 1.875rem;
-  font-weight: 700;
-  color: #3b82f6;
+  font-size: 1.125rem;
+  color: var(--accent);
+  text-shadow: 2px 2px 0 var(--border-shadow);
 }
 
 .subtitle {
-  color: #94a3b8;
+  color: var(--text-muted);
   margin-top: 0.25rem;
+  font-size: 0.75rem;
 }
 
 .actions {
@@ -142,7 +154,7 @@ onMounted(() => {
 .loading, .empty-state {
   text-align: center;
   padding: 3rem;
-  color: #94a3b8;
+  color: var(--text-muted);
 }
 
 .server-grid {

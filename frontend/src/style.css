@@ -1,3 +1,138 @@
+/* ========================================
+   RealmRunner — Minecraft-themed CSS
+   3 switchable themes via data-theme attr
+   ======================================== */
+
+/* --- Theme: Dirt/Wood (default) --- */
+[data-theme="dirt"] {
+  --bg-primary: #2d1b0e;
+  --bg-card: #4a3728;
+  --bg-input: #1e1008;
+  --bg-header: #3a2616;
+  --text-primary: #d4c4a8;
+  --text-muted: #8b7355;
+  --accent: #5b8731;
+  --accent-hover: #4a7028;
+  --accent-text: #1a2e0a;
+  --danger: #b02e26;
+  --danger-hover: #8b2420;
+  --danger-text: #fecaca;
+  --warning: #c77c1e;
+  --warning-hover: #a56818;
+  --warning-text: #3d2607;
+  --secondary: #6b5440;
+  --secondary-hover: #564434;
+  --success: #5b8731;
+  --success-hover: #4a7028;
+  --success-text: #1a2e0a;
+  --border: #6b4c2a;
+  --border-highlight: #8b7355;
+  --border-shadow: #1e1008;
+  --overlay: rgba(15, 8, 2, 0.85);
+  --alert-error-bg: #4a1515;
+  --alert-error-border: #b02e26;
+  --alert-error-text: #fecaca;
+  --alert-success-bg: #1a3a1a;
+  --alert-success-border: #5b8731;
+  --alert-success-text: #a7f3d0;
+  --status-stopped-bg: #6b5440;
+  --status-stopped-text: #d4c4a8;
+  --status-starting-bg: #c77c1e;
+  --status-starting-text: #3d2607;
+  --status-running-bg: #5b8731;
+  --status-running-text: #1a2e0a;
+  --status-stopping-bg: #b02e26;
+  --status-stopping-text: #fecaca;
+}
+
+/* --- Theme: Stone/Dark --- */
+[data-theme="stone"] {
+  --bg-primary: #1a1a2e;
+  --bg-card: #2d2d44;
+  --bg-input: #12121f;
+  --bg-header: #232338;
+  --text-primary: #e0e0e0;
+  --text-muted: #8888aa;
+  --accent: #2ecc71;
+  --accent-hover: #27ae60;
+  --accent-text: #0a2e15;
+  --danger: #e74c3c;
+  --danger-hover: #c0392b;
+  --danger-text: #fde8e8;
+  --warning: #f39c12;
+  --warning-hover: #d68910;
+  --warning-text: #3d2607;
+  --secondary: #555577;
+  --secondary-hover: #444466;
+  --success: #2ecc71;
+  --success-hover: #27ae60;
+  --success-text: #0a2e15;
+  --border: #444466;
+  --border-highlight: #666688;
+  --border-shadow: #12121f;
+  --overlay: rgba(10, 10, 20, 0.85);
+  --alert-error-bg: #3a1515;
+  --alert-error-border: #e74c3c;
+  --alert-error-text: #fde8e8;
+  --alert-success-bg: #0a2e15;
+  --alert-success-border: #2ecc71;
+  --alert-success-text: #a7f3d0;
+  --status-stopped-bg: #555577;
+  --status-stopped-text: #e0e0e0;
+  --status-starting-bg: #f39c12;
+  --status-starting-text: #3d2607;
+  --status-running-bg: #2ecc71;
+  --status-running-text: #0a2e15;
+  --status-stopping-bg: #e74c3c;
+  --status-stopping-text: #fde8e8;
+}
+
+/* --- Theme: Creeper Green --- */
+[data-theme="creeper"] {
+  --bg-primary: #0d1117;
+  --bg-card: #1a2332;
+  --bg-input: #0a0e14;
+  --bg-header: #131d2a;
+  --text-primary: #c8e6c9;
+  --text-muted: #6a8a6a;
+  --accent: #43a047;
+  --accent-hover: #388e3c;
+  --accent-text: #0a2e0a;
+  --danger: #c62828;
+  --danger-hover: #a52222;
+  --danger-text: #ffcdd2;
+  --warning: #8bc34a;
+  --warning-hover: #7cb342;
+  --warning-text: #1a2e0a;
+  --secondary: #37474f;
+  --secondary-hover: #2c3a42;
+  --success: #43a047;
+  --success-hover: #388e3c;
+  --success-text: #0a2e0a;
+  --border: #2e7d32;
+  --border-highlight: #4caf50;
+  --border-shadow: #0a0e14;
+  --overlay: rgba(5, 8, 10, 0.85);
+  --alert-error-bg: #3a1515;
+  --alert-error-border: #c62828;
+  --alert-error-text: #ffcdd2;
+  --alert-success-bg: #0a2e0a;
+  --alert-success-border: #43a047;
+  --alert-success-text: #a5d6a7;
+  --status-stopped-bg: #37474f;
+  --status-stopped-text: #c8e6c9;
+  --status-starting-bg: #8bc34a;
+  --status-starting-text: #1a2e0a;
+  --status-running-bg: #43a047;
+  --status-running-text: #0a2e0a;
+  --status-stopping-bg: #c62828;
+  --status-stopping-text: #ffcdd2;
+}
+
+/* ========================================
+   Global Reset & Base
+   ======================================== */
+
 * {
   margin: 0;
   padding: 0;
@@ -5,9 +140,9 @@
 }
 
 body {
-  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
-  background: #0f172a;
-  color: #e2e8f0;
+  font-family: 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
+  background: var(--bg-primary);
+  color: var(--text-primary);
   min-height: 100vh;
 }
 
@@ -24,63 +159,111 @@ input, select {
   font-family: inherit;
 }
 
+/* Pixel font for headings and UI elements */
+.pixel-font {
+  font-family: 'Press Start 2P', monospace;
+}
+
+/* ========================================
+   Layout
+   ======================================== */
+
 .container {
   max-width: 1200px;
   margin: 0 auto;
   padding: 2rem;
 }
 
+/* ========================================
+   Minecraft-style 3D border mixin
+   ======================================== */
+
+.mc-border {
+  border: 2px solid var(--border);
+  box-shadow:
+    inset -2px -2px 0 var(--border-shadow),
+    inset 2px 2px 0 var(--border-highlight);
+}
+
+/* ========================================
+   Buttons
+   ======================================== */
+
 .btn {
   padding: 0.5rem 1rem;
-  border: none;
-  border-radius: 0.375rem;
+  border: 2px solid var(--border);
+  border-radius: 2px;
+  font-family: 'Press Start 2P', monospace;
+  font-size: 0.625rem;
   font-weight: 500;
-  transition: all 0.2s;
+  transition: background 0.05s;
+  box-shadow:
+    inset -2px -2px 0 rgba(0,0,0,0.3),
+    inset 2px 2px 0 rgba(255,255,255,0.1);
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.btn:hover {
+  box-shadow:
+    inset -1px -1px 0 rgba(0,0,0,0.3),
+    inset 1px 1px 0 rgba(255,255,255,0.15);
+}
+
+.btn:active {
+  box-shadow:
+    inset 2px 2px 0 rgba(0,0,0,0.3),
+    inset -2px -2px 0 rgba(255,255,255,0.1);
 }
 
 .btn-primary {
-  background: #3b82f6;
-  color: white;
+  background: var(--accent);
+  color: var(--accent-text);
+  border-color: var(--accent-hover);
 }
 
 .btn-primary:hover {
-  background: #2563eb;
+  background: var(--accent-hover);
 }
 
 .btn-success {
-  background: #10b981;
-  color: white;
+  background: var(--success);
+  color: var(--success-text);
+  border-color: var(--success-hover);
 }
 
 .btn-success:hover {
-  background: #059669;
+  background: var(--success-hover);
 }
 
 .btn-danger {
-  background: #ef4444;
-  color: white;
+  background: var(--danger);
+  color: var(--danger-text);
+  border-color: var(--danger-hover);
 }
 
 .btn-danger:hover {
-  background: #dc2626;
+  background: var(--danger-hover);
 }
 
 .btn-secondary {
-  background: #64748b;
-  color: white;
+  background: var(--secondary);
+  color: var(--text-primary);
+  border-color: var(--secondary-hover);
 }
 
 .btn-secondary:hover {
-  background: #475569;
+  background: var(--secondary-hover);
 }
 
 .btn-warning {
-  background: #f59e0b;
-  color: #78350f;
+  background: var(--warning);
+  color: var(--warning-text);
+  border-color: var(--warning-hover);
 }
 
 .btn-warning:hover {
-  background: #d97706;
+  background: var(--warning-hover);
 }
 
 .btn:disabled {
@@ -88,31 +271,49 @@ input, select {
   cursor: not-allowed;
 }
 
+/* ========================================
+   Cards
+   ======================================== */
+
 .card {
-  background: #1e293b;
-  border-radius: 0.5rem;
+  background: var(--bg-card);
+  border: 2px solid var(--border);
+  border-radius: 2px;
   padding: 1.5rem;
-  box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+  box-shadow:
+    inset -2px -2px 0 var(--border-shadow),
+    inset 2px 2px 0 var(--border-highlight);
 }
+
+/* ========================================
+   Inputs
+   ======================================== */
 
 .input {
   padding: 0.5rem;
-  border: 1px solid #475569;
-  border-radius: 0.375rem;
-  background: #0f172a;
-  color: #e2e8f0;
+  border: 2px solid var(--border);
+  border-radius: 2px;
+  background: var(--bg-input);
+  color: var(--text-primary);
   width: 100%;
+  box-shadow:
+    inset 2px 2px 0 rgba(0,0,0,0.2),
+    inset -2px -2px 0 rgba(255,255,255,0.05);
 }
 
 .input:focus {
   outline: none;
-  border-color: #3b82f6;
+  border-color: var(--accent);
 }
+
+/* ========================================
+   Modals
+   ======================================== */
 
 .modal-overlay {
   position: fixed;
   inset: 0;
-  background: rgba(0, 0, 0, 0.75);
+  background: var(--overlay);
   display: flex;
   align-items: center;
   justify-content: center;
@@ -120,20 +321,31 @@ input, select {
 }
 
 .modal {
-  background: #1e293b;
-  border-radius: 0.5rem;
+  background: var(--bg-card);
+  border: 2px solid var(--border);
+  border-radius: 2px;
   padding: 2rem;
   max-width: 500px;
   width: 90%;
   max-height: 90vh;
   overflow-y: auto;
+  box-shadow:
+    inset -2px -2px 0 var(--border-shadow),
+    inset 2px 2px 0 var(--border-highlight),
+    0 8px 32px rgba(0, 0, 0, 0.5);
 }
 
 .modal-header {
-  font-size: 1.5rem;
+  font-family: 'Press Start 2P', monospace;
+  font-size: 0.875rem;
   font-weight: 600;
   margin-bottom: 1rem;
+  color: var(--text-primary);
 }
+
+/* ========================================
+   Forms
+   ======================================== */
 
 .form-group {
   margin-bottom: 1rem;
@@ -143,22 +355,29 @@ input, select {
   display: block;
   margin-bottom: 0.5rem;
   font-weight: 500;
+  color: var(--text-muted);
+  font-size: 0.875rem;
 }
+
+/* ========================================
+   Alerts
+   ======================================== */
 
 .alert {
   padding: 1rem;
-  border-radius: 0.375rem;
+  border-radius: 2px;
   margin-bottom: 1rem;
+  border: 2px solid;
 }
 
 .alert-error {
-  background: #7f1d1d;
-  border: 1px solid #dc2626;
-  color: #fecaca;
+  background: var(--alert-error-bg);
+  border-color: var(--alert-error-border);
+  color: var(--alert-error-text);
 }
 
 .alert-success {
-  background: #064e3b;
-  border: 1px solid #10b981;
-  color: #a7f3d0;
+  background: var(--alert-success-bg);
+  border-color: var(--alert-success-border);
+  color: var(--alert-success-text);
 }

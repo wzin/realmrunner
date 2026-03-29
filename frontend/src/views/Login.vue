@@ -1,7 +1,7 @@
 <template>
   <div class="login-page">
     <div class="login-card card">
-      <h1 class="login-title">RealmRunner</h1>
+      <h1 class="login-title pixel-font">RealmRunner</h1>
       <p class="login-subtitle">Minecraft Server Manager</p>
 
       <form @submit.prevent="handleLogin">
@@ -71,17 +71,18 @@ async function handleLogin() {
 }
 
 .login-title {
-  font-size: 2rem;
-  font-weight: 700;
+  font-size: 1.25rem;
   text-align: center;
   margin-bottom: 0.5rem;
-  color: #3b82f6;
+  color: var(--accent);
+  text-shadow: 2px 2px 0 var(--border-shadow);
 }
 
 .login-subtitle {
   text-align: center;
-  color: #94a3b8;
+  color: var(--text-muted);
   margin-bottom: 2rem;
+  font-size: 0.875rem;
 }
 
 .w-full {

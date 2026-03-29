@@ -1,7 +1,7 @@
 <template>
   <div class="modal-overlay" @click.self="$emit('close')">
     <div class="modal modal-large">
-      <div class="modal-header">
+      <div class="modal-header pixel-font">
         <span>{{ server.name }} - Console</span>
         <button @click="$emit('close')" class="close-btn">&times;</button>
       </div>
@@ -152,17 +152,18 @@ onUnmounted(() => {
 .close-btn {
   background: none;
   border: none;
-  color: #e2e8f0;
+  color: var(--text-primary);
   font-size: 2rem;
   line-height: 1;
   cursor: pointer;
   padding: 0;
   width: 2rem;
   height: 2rem;
+  font-family: inherit;
 }
 
 .close-btn:hover {
-  color: #3b82f6;
+  color: var(--accent);
 }
 
 .console-container {
@@ -175,17 +176,20 @@ onUnmounted(() => {
 
 .log-output {
   flex: 1;
-  background: #0f172a;
-  border: 1px solid #334155;
-  border-radius: 0.375rem;
+  background: var(--bg-input);
+  border: 2px solid var(--border);
+  border-radius: 2px;
   padding: 1rem;
   overflow-y: auto;
   font-family: 'Courier New', monospace;
   font-size: 0.875rem;
+  box-shadow:
+    inset 2px 2px 0 rgba(0,0,0,0.2),
+    inset -2px -2px 0 rgba(255,255,255,0.05);
 }
 
 .empty-logs {
-  color: #64748b;
+  color: var(--text-muted);
   text-align: center;
   padding: 2rem;
 }
@@ -196,12 +200,12 @@ onUnmounted(() => {
 }
 
 .log-time {
-  color: #64748b;
+  color: var(--text-muted);
   margin-right: 0.5rem;
 }
 
 .log-message {
-  color: #e2e8f0;
+  color: var(--text-primary);
 }
 
 .command-form {

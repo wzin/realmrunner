@@ -2,10 +2,10 @@
   <div class="server-card card">
     <div class="server-header">
       <div>
-        <h3 class="server-name">{{ server.name }}</h3>
+        <h3 class="server-name pixel-font">{{ server.name }}</h3>
         <p class="server-version">Version: {{ server.version }}</p>
       </div>
-      <span :class="['status-badge', `status-${server.status}`]">
+      <span :class="['status-badge pixel-font', `status-${server.status}`]">
         {{ server.status }}
       </span>
     </div>
@@ -191,42 +191,46 @@ function formatDate(dateString) {
 }
 
 .server-name {
-  font-size: 1.25rem;
-  font-weight: 600;
-  margin-bottom: 0.25rem;
+  font-size: 0.75rem;
+  margin-bottom: 0.5rem;
+  color: var(--text-primary);
 }
 
 .server-version {
-  color: #94a3b8;
+  color: var(--text-muted);
   font-size: 0.875rem;
 }
 
 .status-badge {
   padding: 0.25rem 0.75rem;
-  border-radius: 9999px;
-  font-size: 0.75rem;
-  font-weight: 600;
+  border: 2px solid;
+  border-radius: 2px;
+  font-size: 0.5rem;
   text-transform: uppercase;
 }
 
 .status-stopped {
-  background: #475569;
-  color: #e2e8f0;
+  background: var(--status-stopped-bg);
+  color: var(--status-stopped-text);
+  border-color: var(--status-stopped-bg);
 }
 
 .status-starting {
-  background: #f59e0b;
-  color: #78350f;
+  background: var(--status-starting-bg);
+  color: var(--status-starting-text);
+  border-color: var(--status-starting-bg);
 }
 
 .status-running {
-  background: #10b981;
-  color: #064e3b;
+  background: var(--status-running-bg);
+  color: var(--status-running-text);
+  border-color: var(--status-running-bg);
 }
 
 .status-stopping {
-  background: #ef4444;
-  color: #7f1d1d;
+  background: var(--status-stopping-bg);
+  color: var(--status-stopping-text);
+  border-color: var(--status-stopping-bg);
 }
 
 .server-info {
@@ -241,7 +245,7 @@ function formatDate(dateString) {
 }
 
 .info-label {
-  color: #94a3b8;
+  color: var(--text-muted);
   font-size: 0.875rem;
 }
 
@@ -251,7 +255,7 @@ function formatDate(dateString) {
 
 .connection-url {
   font-family: monospace;
-  color: #3b82f6;
+  color: var(--accent);
 }
 
 .server-actions {
@@ -262,6 +266,6 @@ function formatDate(dateString) {
 
 .btn-sm {
   padding: 0.375rem 0.75rem;
-  font-size: 0.875rem;
+  font-size: 0.5rem;
 }
 </style>

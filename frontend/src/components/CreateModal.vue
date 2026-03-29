@@ -1,7 +1,7 @@
 <template>
   <div class="modal-overlay" @click.self="$emit('close')">
     <div class="modal">
-      <div class="modal-header">Create New Server</div>
+      <div class="modal-header pixel-font">Create New Server</div>
 
       <form @submit.prevent="handleCreate">
         <div v-if="error" class="alert alert-error">
@@ -166,17 +166,17 @@ onMounted(() => {
 .help-text {
   margin-top: 0.25rem;
   font-size: 0.75rem;
-  color: #94a3b8;
+  color: var(--text-muted);
 }
 
 .error-text {
   margin-top: 0.25rem;
   font-size: 0.75rem;
-  color: #ef4444;
+  color: var(--danger);
 }
 
 .input-error {
-  border-color: #ef4444;
+  border-color: var(--danger);
 }
 
 .modal-actions {
