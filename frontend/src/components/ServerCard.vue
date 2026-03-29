@@ -52,9 +52,10 @@
         v-if="server.status === 'stopped'"
         @click="handleStart"
         class="btn btn-success btn-sm"
-        :disabled="loading"
+        :disabled="loading || !server.ready"
+        :title="!server.ready ? 'Downloading server JAR...' : ''"
       >
-        Start
+        {{ server.ready ? 'Start' : 'Downloading...' }}
       </button>
       <button
         v-else-if="server.status === 'running'"

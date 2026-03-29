@@ -2,6 +2,7 @@ package api
 
 import (
 	"fmt"
+	"log"
 	"net/http"
 	"os"
 
@@ -130,7 +131,13 @@ func (h *Handlers) CreateServer(c *gin.Context) {
 			return
 		}
 		serverDir := h.manager.GetServerDir(srv.ID)
-		provider.DownloadServer(serverDir, req.Version)
+		if err := provider.DownloadServer(serverDir, req.Version); err != nil {
+			log.Printf("Failed to download server %s: %v", srv.ID, err)
+			return
+		}
+		// Mark server as ready
+		server.SetServerReady(h.manager.GetDB(), srv.ID, true)
+		log.Printf("Server %s is ready (download complete)", srv.ID)
 	}()
 
 	c.JSON(http.StatusCreated, h.makeServerResponse(srv))
