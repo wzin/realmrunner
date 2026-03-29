@@ -32,10 +32,18 @@ async function request(endpoint, options = {}) {
 
 export const api = {
   // Auth
-  login: (password) => request('/auth/login', {
+  login: (username, password) => request('/auth/login', {
     method: 'POST',
-    body: JSON.stringify({ password }),
+    body: JSON.stringify({ username, password }),
   }),
+
+  // Users
+  getMe: () => request('/me'),
+  changePassword: (password) => request('/me/password', { method: 'PUT', body: JSON.stringify({ password }) }),
+  getUsers: () => request('/users'),
+  createUser: (username, password, role) => request('/users', { method: 'POST', body: JSON.stringify({ username, password, role }) }),
+  updateUser: (id, role) => request(`/users/${id}`, { method: 'PUT', body: JSON.stringify({ role }) }),
+  deleteUser: (id) => request(`/users/${id}`, { method: 'DELETE' }),
 
   // Servers
   getServers: () => request('/servers'),

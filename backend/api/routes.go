@@ -25,6 +25,19 @@ func RegisterRoutes(
 	protected.Use(authMiddleware.RequireAuth())
 
 	handlers := NewHandlers(manager, hub, cfg)
+	userHandlers := NewUserHandlers(authMiddleware)
+
+	// Self-service
+	protected.GET("/me", userHandlers.GetMe)
+	protected.PUT("/me/password", userHandlers.ChangePassword)
+
+	// User management (admin only)
+	admin := protected.Group("")
+	admin.Use(authMiddleware.RequireRole("admin"))
+	admin.GET("/users", userHandlers.ListUsers)
+	admin.POST("/users", userHandlers.CreateUser)
+	admin.PUT("/users/:id", userHandlers.UpdateUser)
+	admin.DELETE("/users/:id", userHandlers.DeleteUser)
 
 	// Server endpoints
 	protected.GET("/servers", handlers.ListServers)
@@ -36,7 +49,7 @@ func RegisterRoutes(
 	protected.DELETE("/servers/:id/wipeout", handlers.WipeoutServer)
 	protected.POST("/servers/:id/command", handlers.SendCommand)
 
-	// Server upgrade, limits, and files
+	// Server upgrade, limits, schedule, and files
 	protected.POST("/servers/:id/upgrade", handlers.UpgradeServer)
 	protected.PUT("/servers/:id/limits", handlers.SetLimits)
 	protected.PUT("/servers/:id/schedule", handlers.SetSchedule)

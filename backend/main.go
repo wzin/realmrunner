@@ -79,7 +79,7 @@ func main() {
 	}))
 
 	// Auth middleware
-	authMiddleware := auth.NewMiddleware(cfg)
+	authMiddleware := auth.NewMiddleware(cfg, db)
 
 	// Register API routes
 	api.RegisterRoutes(router, authMiddleware, manager, hub, cfg)

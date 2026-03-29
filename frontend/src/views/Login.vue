@@ -10,6 +10,18 @@
         </div>
 
         <div class="form-group">
+          <label for="username" class="form-label">Username</label>
+          <input
+            id="username"
+            v-model="username"
+            type="text"
+            class="input"
+            placeholder="admin"
+            :disabled="loading"
+          />
+        </div>
+
+        <div class="form-group">
           <label for="password" class="form-label">Password</label>
           <input
             id="password"
@@ -36,6 +48,7 @@ import { useRouter } from 'vue-router'
 import { api } from '../api/client'
 
 const router = useRouter()
+const username = ref('')
 const password = ref('')
 const error = ref('')
 const loading = ref(false)
@@ -45,8 +58,10 @@ async function handleLogin() {
   loading.value = true
 
   try {
-    const response = await api.login(password.value)
+    const response = await api.login(username.value || 'admin', password.value)
     localStorage.setItem('token', response.token)
+    localStorage.setItem('username', response.username)
+    localStorage.setItem('role', response.role)
     router.push('/dashboard')
   } catch (err) {
     error.value = err.message || 'Login failed'
