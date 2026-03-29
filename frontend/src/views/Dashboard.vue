@@ -9,6 +9,7 @@
           </div>
           <div class="header-right">
             <ThemeSwitcher />
+            <router-link v-if="isOwner" to="/admin" class="btn btn-secondary">Admin</router-link>
             <button @click="handleLogout" class="btn btn-secondary">Logout</button>
           </div>
         </div>
@@ -130,6 +131,7 @@ import ModsModal from '../components/ModsModal.vue'
 import ThemeSwitcher from '../components/ThemeSwitcher.vue'
 
 const router = useRouter()
+const isOwner = ref(localStorage.getItem('role') === 'owner')
 const servers = ref([])
 const loading = ref(false)
 const error = ref('')

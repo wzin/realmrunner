@@ -148,26 +148,42 @@ function formatSize(bytes) {
 }
 
 function buildTree(files) {
-  const root = []
-  const dirs = {}
+  // Build a nested tree from flat file paths
+  const root = { children: {} }
 
   for (const f of files) {
     const parts = f.path.split('/')
-    if (parts.length === 1) {
-      root.push({ name: f.name, path: f.path, size: f.size })
-    } else {
-      const dirName = parts[0]
-      if (!dirs[dirName]) {
-        dirs[dirName] = { name: dirName, children: [] }
+    let node = root
+    for (let i = 0; i < parts.length; i++) {
+      const part = parts[i]
+      if (!node.children[part]) {
+        node.children[part] = { name: part, children: {} }
       }
-      dirs[dirName].children.push({ name: parts.slice(1).join('/'), path: f.path, size: f.size })
+      if (i === parts.length - 1) {
+        // Leaf file
+        node.children[part].path = f.path
+        node.children[part].size = f.size
+        node.children[part].isFile = true
+      }
+      node = node.children[part]
     }
   }
 
-  // Dirs first, then files
-  const dirNodes = Object.values(dirs).sort((a, b) => a.name.localeCompare(b.name))
-  const fileNodes = root.sort((a, b) => a.name.localeCompare(b.name))
-  return [...dirNodes, ...fileNodes]
+  function toArray(node) {
+    const entries = Object.values(node.children)
+    const dirs = entries.filter(e => !e.isFile).map(e => ({
+      name: e.name,
+      children: toArray(e),
+    })).sort((a, b) => a.name.localeCompare(b.name))
+    const fileNodes = entries.filter(e => e.isFile).map(e => ({
+      name: e.name,
+      path: e.path,
+      size: e.size,
+    })).sort((a, b) => a.name.localeCompare(b.name))
+    return [...dirs, ...fileNodes]
+  }
+
+  return toArray(root)
 }
 
 const props = defineProps({ server: { type: Object, required: true } })
@@ -206,12 +222,12 @@ async function selectFile(f) {
   try {
     const resp = await api.getFile(props.server.id, f.path)
     content.value = resp.content
+    loadingContent.value = false
     await nextTick()
-    initEditor(f.name, resp.content)
+    initEditor(f.path, resp.content)
   } catch (err) {
     error.value = 'Failed to load file'
     content.value = ''
-  } finally {
     loadingContent.value = false
   }
 }

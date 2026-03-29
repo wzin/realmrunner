@@ -102,6 +102,22 @@ export const api = {
   getMetrics: (id) => request(`/servers/${id}/metrics`),
   getMetricsHistory: (id, range_) => request(`/servers/${id}/metrics/history?range=${range_}`),
 
+  // Realms
+  getRealms: () => request('/realms'),
+  createRealm: (name, maxCpu, maxMem, maxServers) => request('/realms', {
+    method: 'POST', body: JSON.stringify({ name, max_cpu_cores: maxCpu, max_memory_mb: maxMem, max_servers: maxServers }),
+  }),
+  updateRealm: (id, name, maxCpu, maxMem, maxServers) => request(`/realms/${id}`, {
+    method: 'PUT', body: JSON.stringify({ name, max_cpu_cores: maxCpu, max_memory_mb: maxMem, max_servers: maxServers }),
+  }),
+  deleteRealm: (id) => request(`/realms/${id}`, { method: 'DELETE' }),
+  getRealmAdmins: (id) => request(`/realms/${id}/admins`),
+  addRealmAdmin: (id, userId) => request(`/realms/${id}/admins`, { method: 'POST', body: JSON.stringify({ user_id: userId }) }),
+  removeRealmAdmin: (id, userId) => request(`/realms/${id}/admins/${userId}`, { method: 'DELETE' }),
+  getServerViewers: (id) => request(`/servers/${id}/viewers`),
+  addServerViewer: (id, userId) => request(`/servers/${id}/viewers`, { method: 'POST', body: JSON.stringify({ user_id: userId }) }),
+  removeServerViewer: (id, userId) => request(`/servers/${id}/viewers/${userId}`, { method: 'DELETE' }),
+
   // Versions & Flavors
   getVersions: (flavor, includeSnapshots) => {
     const params = new URLSearchParams()
