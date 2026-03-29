@@ -39,6 +39,9 @@ func NewManager(db *sql.DB, cfg *config.Config, collector *metrics.Collector, re
 	// Clean up orphaned server statuses on startup
 	m.cleanupOrphanedStatuses()
 
+	// Fix ready flag for servers that have server.jar but ready=0
+	m.fixReadyFlags()
+
 	return m
 }
 
@@ -56,6 +59,28 @@ func (m *Manager) cleanupOrphanedStatuses() {
 
 	rows, _ := result.RowsAffected()
 	log.Printf("Startup cleanup: Reset %d orphaned server(s) to stopped status\n", rows)
+}
+
+func (m *Manager) fixReadyFlags() {
+	rows, err := m.db.Query("SELECT id FROM servers WHERE ready = 0")
+	if err != nil {
+		return
+	}
+	defer rows.Close()
+
+	fixed := 0
+	for rows.Next() {
+		var id string
+		rows.Scan(&id)
+		jarPath := filepath.Join(m.getServerDir(id), "server.jar")
+		if _, err := os.Stat(jarPath); err == nil {
+			SetServerReady(m.db, id, true)
+			fixed++
+		}
+	}
+	if fixed > 0 {
+		log.Printf("Fixed ready flag for %d server(s) with existing JARs", fixed)
+	}
 }
 
 func (m *Manager) CreateServer(name, version, flavor string, port int) (*Server, error) {
