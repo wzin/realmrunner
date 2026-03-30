@@ -2,6 +2,7 @@ import { createRouter, createWebHistory } from 'vue-router'
 import Login from '../views/Login.vue'
 import Dashboard from '../views/Dashboard.vue'
 import AdminPanel from '../views/AdminPanel.vue'
+import ShareView from '../views/ShareView.vue'
 
 const router = createRouter({
   history: createWebHistory(),
@@ -26,6 +27,12 @@ const router = createRouter({
       name: 'Admin',
       component: AdminPanel,
       meta: { requiresAuth: true }
+    },
+    {
+      path: '/share/:token',
+      name: 'Share',
+      component: ShareView,
+      props: true
     }
   ]
 })

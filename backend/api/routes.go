@@ -20,6 +20,12 @@ func RegisterRoutes(
 	// Auth endpoints (no auth required)
 	api.POST("/auth/login", authMiddleware.Login)
 
+	// Public share endpoints (no auth required)
+	shareHandlers := NewHandlers(manager, hub, cfg)
+	api.GET("/share/:token", shareHandlers.GetSharedServer)
+	api.GET("/share/:token/metrics", shareHandlers.GetSharedMetricsHistory)
+	api.GET("/share/:token/ws", shareHandlers.HandleSharedWebSocket)
+
 	// Protected endpoints
 	protected := api.Group("")
 	protected.Use(authMiddleware.RequireAuth())
@@ -55,6 +61,10 @@ func RegisterRoutes(
 	protected.GET("/servers/:id/viewers", realmHandlers.ListServerViewers)
 	protected.POST("/servers/:id/viewers", realmHandlers.AddServerViewer)
 	protected.DELETE("/servers/:id/viewers/:uid", realmHandlers.RemoveServerViewer)
+
+	// Share links
+	protected.POST("/servers/:id/share", handlers.GenerateShareLink)
+	protected.DELETE("/servers/:id/share", handlers.RevokeShareLink)
 
 	// Server endpoints
 	protected.GET("/servers", handlers.ListServers)

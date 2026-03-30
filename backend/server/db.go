@@ -21,6 +21,7 @@ type Server struct {
 	MemoryLimitMB   int        `json:"memory_limit_mb"`
 	RestartSchedule string     `json:"restart_schedule"`
 	Ready           bool       `json:"ready"`
+	ShareToken      string     `json:"share_token,omitempty"`
 	CreatedAt     time.Time  `json:"created_at"`
 	LastStartedAt *time.Time `json:"last_started_at,omitempty"`
 }
@@ -67,6 +68,7 @@ func InitDB(dataDir string) (*sql.DB, error) {
 	db.Exec("ALTER TABLE servers ADD COLUMN memory_limit_mb INTEGER DEFAULT 0")
 	db.Exec("ALTER TABLE servers ADD COLUMN restart_schedule TEXT DEFAULT ''")
 	db.Exec("ALTER TABLE servers ADD COLUMN ready INTEGER DEFAULT 0")
+	db.Exec("ALTER TABLE servers ADD COLUMN share_token TEXT DEFAULT ''")
 
 	return db, nil
 }
@@ -81,7 +83,7 @@ func CreateServer(db *sql.DB, server *Server) error {
 }
 
 func GetServer(db *sql.DB, id string) (*Server, error) {
-	query := `SELECT id, name, version, flavor, port, status, cpu_limit, memory_limit_mb, restart_schedule, ready, created_at, last_started_at FROM servers WHERE id = ?`
+	query := `SELECT id, name, version, flavor, port, status, cpu_limit, memory_limit_mb, restart_schedule, ready, share_token, created_at, last_started_at FROM servers WHERE id = ?`
 	server := &Server{}
 	err := db.QueryRow(query, id).Scan(
 		&server.ID,
@@ -94,6 +96,7 @@ func GetServer(db *sql.DB, id string) (*Server, error) {
 		&server.MemoryLimitMB,
 		&server.RestartSchedule,
 		&server.Ready,
+		&server.ShareToken,
 		&server.CreatedAt,
 		&server.LastStartedAt,
 	)
@@ -104,7 +107,7 @@ func GetServer(db *sql.DB, id string) (*Server, error) {
 }
 
 func GetAllServers(db *sql.DB) ([]*Server, error) {
-	query := `SELECT id, name, version, flavor, port, status, cpu_limit, memory_limit_mb, restart_schedule, ready, created_at, last_started_at FROM servers ORDER BY created_at DESC`
+	query := `SELECT id, name, version, flavor, port, status, cpu_limit, memory_limit_mb, restart_schedule, ready, share_token, created_at, last_started_at FROM servers ORDER BY created_at DESC`
 	rows, err := db.Query(query)
 	if err != nil {
 		return nil, err
@@ -125,6 +128,7 @@ func GetAllServers(db *sql.DB) ([]*Server, error) {
 			&server.MemoryLimitMB,
 			&server.RestartSchedule,
 			&server.Ready,
+			&server.ShareToken,
 			&server.CreatedAt,
 			&server.LastStartedAt,
 		)
@@ -147,6 +151,30 @@ func UpdateServerLastStarted(db *sql.DB, id string, timestamp time.Time) error {
 	query := `UPDATE servers SET last_started_at = ? WHERE id = ?`
 	_, err := db.Exec(query, timestamp, id)
 	return err
+}
+
+func SetShareToken(db *sql.DB, id, token string) error {
+	_, err := db.Exec("UPDATE servers SET share_token = ? WHERE id = ?", token, id)
+	return err
+}
+
+func GetServerByShareToken(db *sql.DB, token string) (*Server, error) {
+	if token == "" {
+		return nil, fmt.Errorf("empty token")
+	}
+	// Reuse GetServer logic but query by share_token
+	query := `SELECT id, name, version, flavor, port, status, cpu_limit, memory_limit_mb, restart_schedule, ready, share_token, created_at, last_started_at FROM servers WHERE share_token = ?`
+	server := &Server{}
+	err := db.QueryRow(query, token).Scan(
+		&server.ID, &server.Name, &server.Version, &server.Flavor,
+		&server.Port, &server.Status, &server.CPULimit, &server.MemoryLimitMB,
+		&server.RestartSchedule, &server.Ready, &server.ShareToken,
+		&server.CreatedAt, &server.LastStartedAt,
+	)
+	if err != nil {
+		return nil, err
+	}
+	return server, nil
 }
 
 func SetServerReady(db *sql.DB, id string, ready bool) error {

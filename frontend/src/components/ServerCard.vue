@@ -83,6 +83,15 @@
       </div>
     </div>
 
+    <!-- Access & Sharing -->
+    <div class="action-section">
+      <span class="section-label pixel-font">Access</span>
+      <div class="action-buttons">
+        <button @click="$emit('viewers', server)" class="btn btn-secondary btn-sm">Viewers</button>
+        <button @click="$emit('share', server)" class="btn btn-secondary btn-sm">Share Link</button>
+      </div>
+    </div>
+
     <!-- Data Management -->
     <div class="action-section">
       <span class="section-label pixel-font">Data</span>
@@ -106,7 +115,7 @@ const props = defineProps({
   }
 })
 
-const emit = defineEmits(['refresh', 'console', 'metrics', 'upgrade', 'limits', 'files', 'players', 'backups', 'mods', 'schedule'])
+const emit = defineEmits(['refresh', 'console', 'metrics', 'upgrade', 'limits', 'files', 'players', 'backups', 'mods', 'schedule', 'share', 'viewers'])
 
 const loading = ref(false)
 const error = ref('')

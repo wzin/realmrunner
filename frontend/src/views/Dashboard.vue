@@ -54,6 +54,8 @@
           @backups="openBackups"
           @mods="openMods"
           @schedule="openSchedule"
+          @share="openShare"
+          @viewers="openViewers"
         />
       </div>
     </main>
@@ -124,6 +126,19 @@
       </div>
     </div>
 
+    <ShareModal
+      v-if="shareServer"
+      :server="shareServer"
+      @close="shareServer = null"
+      @updated="handleShareUpdated"
+    />
+
+    <ViewersModal
+      v-if="viewersServer"
+      :server="viewersServer"
+      @close="viewersServer = null"
+    />
+
     <ScheduleModal
       v-if="scheduleServer"
       :server="scheduleServer"
@@ -154,6 +169,8 @@ import WhitelistModal from '../components/WhitelistModal.vue'
 import BackupsModal from '../components/BackupsModal.vue'
 import ModsModal from '../components/ModsModal.vue'
 import ScheduleModal from '../components/ScheduleModal.vue'
+import ShareModal from '../components/ShareModal.vue'
+import ViewersModal from '../components/ViewersModal.vue'
 import ThemeSwitcher from '../components/ThemeSwitcher.vue'
 
 const router = useRouter()
@@ -175,6 +192,8 @@ const playersServer = ref(null)
 const backupsServer = ref(null)
 const modsServer = ref(null)
 const scheduleServer = ref(null)
+const shareServer = ref(null)
+const viewersServer = ref(null)
 
 async function loadServers() {
   loading.value = true
@@ -235,6 +254,19 @@ function handleUpgraded() {
 
 function openLimits(server) {
   limitsServer.value = server
+}
+
+function openShare(server) {
+  shareServer.value = server
+}
+
+function handleShareUpdated() {
+  shareServer.value = null
+  loadServers()
+}
+
+function openViewers(server) {
+  viewersServer.value = server
 }
 
 function openSchedule(server) {

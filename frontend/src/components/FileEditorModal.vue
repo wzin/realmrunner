@@ -9,7 +9,10 @@
       <div class="editor-container">
         <div class="file-tree">
           <div v-if="loadingFiles" class="tree-loading">Loading...</div>
-          <div v-else-if="!files.length" class="tree-empty">No editable files</div>
+          <div v-else-if="!files.length" class="tree-empty">
+            <p>No config files found.</p>
+            <p class="tree-hint">Start the server at least once to generate configuration files.</p>
+          </div>
           <template v-else>
             <FileTreeNode
               v-for="node in fileTree"
@@ -331,6 +334,12 @@ onMounted(loadFiles)
   padding: 1rem;
   text-align: center;
   color: var(--text-muted);
+}
+
+.tree-hint {
+  margin-top: 0.5rem;
+  font-size: 0.625rem;
+  color: var(--warning);
 }
 
 :deep(.tree-item) {

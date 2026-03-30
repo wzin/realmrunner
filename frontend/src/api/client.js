@@ -107,6 +107,10 @@ export const api = {
   getMetrics: (id) => request(`/servers/${id}/metrics`),
   getMetricsHistory: (id, range_) => request(`/servers/${id}/metrics/history?range=${range_}`),
 
+  // Share links
+  generateShareLink: (id) => request(`/servers/${id}/share`, { method: 'POST' }),
+  revokeShareLink: (id) => request(`/servers/${id}/share`, { method: 'DELETE' }),
+
   // Realms
   getRealms: () => request('/realms'),
   createRealm: (name, maxCpu, maxMem, maxServers) => request('/realms', {
