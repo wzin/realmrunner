@@ -5,7 +5,10 @@ A web-based Minecraft Java Edition server manager packaged as a Docker container
 ## Features
 
 - **Multiple Servers**: Create and manage multiple Minecraft servers
-- **Version Selection**: Choose from official Minecraft Java Edition releases
+- **Version Selection**: Choose from official Minecraft Java Edition releases, including the
+  year-based 26.x releases, plus Paper and Purpur builds
+- **Multiple Java Runtimes**: Java 25 (required by Minecraft 26.x) and Java 21 ship in the image;
+  the right one is picked automatically per server version
 - **Server Controls**: Start, stop, and wipeout servers with one click
 - **Real-time Logs**: View server logs as they happen
 - **Console Access**: Send commands directly to running servers

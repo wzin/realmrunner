@@ -4,8 +4,10 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/http"
+	"net/url"
 	"os"
 	"path/filepath"
+	"time"
 
 	"github.com/gin-gonic/gin"
 )
@@ -20,19 +22,18 @@ type mojangProfile struct {
 	Name string `json:"name"`
 }
 
+// profileLookupURLs are tried in order: the current Minecraft Services endpoint
+// first, then the legacy api.mojang.com one Mojang has been winding down.
+var profileLookupURLs = []string{
+	"https://api.minecraftservices.com/minecraft/profile/lookup/name/%s",
+	"https://api.mojang.com/users/profiles/minecraft/%s",
+}
+
+var profileClient = &http.Client{Timeout: 10 * time.Second}
+
 func resolvePlayerUUID(name string) (string, error) {
-	resp, err := http.Get(fmt.Sprintf("https://api.mojang.com/users/profiles/minecraft/%s", name))
+	profile, err := lookupProfile(name)
 	if err != nil {
-		return "", fmt.Errorf("failed to resolve player: %w", err)
-	}
-	defer resp.Body.Close()
-
-	if resp.StatusCode != 200 {
-		return "", fmt.Errorf("player '%s' not found", name)
-	}
-
-	var profile mojangProfile
-	if err := json.NewDecoder(resp.Body).Decode(&profile); err != nil {
 		return "", err
 	}
 
@@ -42,6 +43,44 @@ func resolvePlayerUUID(name string) (string, error) {
 		id = id[:8] + "-" + id[8:12] + "-" + id[12:16] + "-" + id[16:20] + "-" + id[20:]
 	}
 	return id, nil
+}
+
+func lookupProfile(name string) (*mojangProfile, error) {
+	var lastErr error
+
+	for _, urlTemplate := range profileLookupURLs {
+		profile, err := fetchProfile(fmt.Sprintf(urlTemplate, url.PathEscape(name)))
+		if err == nil {
+			return profile, nil
+		}
+		lastErr = err
+	}
+
+	if lastErr == nil {
+		lastErr = fmt.Errorf("player '%s' not found", name)
+	}
+	return nil, lastErr
+}
+
+func fetchProfile(lookupURL string) (*mojangProfile, error) {
+	resp, err := profileClient.Get(lookupURL)
+	if err != nil {
+		return nil, fmt.Errorf("failed to resolve player: %w", err)
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		return nil, fmt.Errorf("profile lookup returned %s", resp.Status)
+	}
+
+	var profile mojangProfile
+	if err := json.NewDecoder(resp.Body).Decode(&profile); err != nil {
+		return nil, err
+	}
+	if profile.ID == "" {
+		return nil, fmt.Errorf("profile lookup returned no id")
+	}
+	return &profile, nil
 }
 
 func readPlayerList(serverDir, filename string) ([]PlayerEntry, error) {
@@ -273,4 +312,3 @@ func (h *Handlers) RemoveOp(c *gin.Context) {
 
 	c.JSON(http.StatusOK, gin.H{"players": filtered})
 }
-

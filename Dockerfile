@@ -1,5 +1,5 @@
 # Stage 1: Build frontend
-FROM node:20-alpine AS frontend-builder
+FROM node:22-alpine AS frontend-builder
 
 WORKDIR /app/frontend
 
@@ -10,7 +10,7 @@ COPY frontend/ ./
 RUN npm run build
 
 # Stage 2: Build backend
-FROM golang:1.21 AS backend-builder
+FROM golang:1.25 AS backend-builder
 
 WORKDIR /app/backend
 
@@ -21,7 +21,11 @@ RUN go mod download && go mod tidy
 RUN CGO_ENABLED=1 GOOS=linux go build -o realmrunner .
 
 # Stage 3: Runtime
-FROM eclipse-temurin:21-jre
+#
+# Minecraft 26.x requires Java 25, while 1.20.5-1.21.x run on Java 21, so the
+# image ships both runtimes side by side under /opt/java/<major> and the
+# backend picks the right one per server version.
+FROM eclipse-temurin:25-jre
 
 WORKDIR /app
 
@@ -29,6 +33,10 @@ WORKDIR /app
 RUN apt-get update && \
     apt-get install -y ca-certificates && \
     rm -rf /var/lib/apt/lists/*
+
+# Java 25 (default runtime of this image) + Java 21 for older Minecraft versions
+COPY --from=eclipse-temurin:21-jre /opt/java/openjdk /opt/java/21
+RUN ln -s /opt/java/openjdk /opt/java/25
 
 # Copy built backend binary
 COPY --from=backend-builder /app/backend/realmrunner /app/realmrunner

@@ -10,7 +10,7 @@ import (
 	"time"
 )
 
-const purpurAPIBase = "https://api.purpurmc.org/v2/purpur"
+var purpurAPIBase = "https://api.purpurmc.org/v2/purpur"
 
 type PurpurProvider struct {
 	mu          sync.RWMutex
@@ -76,10 +76,6 @@ func (p *PurpurProvider) DownloadServer(destDir string, version string) error {
 	return downloadJar(downloadURL, jarPath, fmt.Sprintf("Purpur %s", version))
 }
 
-func (p *PurpurProvider) StartCommand(serverDir string, memoryMB int) (string, []string) {
-	return "java", []string{
-		fmt.Sprintf("-Xmx%dM", memoryMB),
-		fmt.Sprintf("-Xms%dM", memoryMB),
-		"-jar", "server.jar", "nogui",
-	}
+func (p *PurpurProvider) StartCommand(serverDir string, memoryMB int, version string) (string, []string) {
+	return JavaCommandForVersion(version), javaArgs(memoryMB)
 }

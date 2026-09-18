@@ -8,7 +8,7 @@ import (
 	"time"
 )
 
-const versionManifestURL = "https://launchermeta.mojang.com/mc/game/version_manifest.json"
+var versionManifestURL = "https://piston-meta.mojang.com/mc/game/version_manifest_v2.json"
 
 type VersionManifest struct {
 	Latest struct {
@@ -32,6 +32,9 @@ type VersionDetails struct {
 			URL string `json:"url"`
 		} `json:"server"`
 	} `json:"downloads"`
+	JavaVersion struct {
+		MajorVersion int `json:"majorVersion"`
+	} `json:"javaVersion"`
 }
 
 type VersionFetcher struct {
@@ -39,13 +42,20 @@ type VersionFetcher struct {
 	manifest    *VersionManifest
 	lastFetched time.Time
 	cacheTTL    time.Duration
+
+	detailsMu sync.RWMutex
+	details   map[string]*VersionDetails
 }
 
 func NewVersionFetcher() *VersionFetcher {
 	return &VersionFetcher{
 		cacheTTL: 1 * time.Hour,
+		details:  make(map[string]*VersionDetails),
 	}
 }
+
+// detailsClient has a timeout so a slow Mojang API can never block a server start.
+var detailsClient = &http.Client{Timeout: 10 * time.Second}
 
 func (vf *VersionFetcher) GetVersions() ([]string, error) {
 	manifest, err := vf.getManifest()
@@ -65,9 +75,41 @@ func (vf *VersionFetcher) GetVersions() ([]string, error) {
 }
 
 func (vf *VersionFetcher) GetServerDownloadURL(version string) (string, error) {
-	manifest, err := vf.getManifest()
+	details, err := vf.getVersionDetails(version)
 	if err != nil {
 		return "", err
+	}
+
+	if details.Downloads.Server.URL == "" {
+		return "", fmt.Errorf("server download not available for version %s", version)
+	}
+
+	return details.Downloads.Server.URL, nil
+}
+
+// GetJavaMajor returns the Java major version Mojang declares for a release.
+func (vf *VersionFetcher) GetJavaMajor(version string) (int, error) {
+	details, err := vf.getVersionDetails(version)
+	if err != nil {
+		return 0, err
+	}
+	if details.JavaVersion.MajorVersion == 0 {
+		return 0, fmt.Errorf("no java version declared for %s", version)
+	}
+	return details.JavaVersion.MajorVersion, nil
+}
+
+func (vf *VersionFetcher) getVersionDetails(version string) (*VersionDetails, error) {
+	vf.detailsMu.RLock()
+	cached, ok := vf.details[version]
+	vf.detailsMu.RUnlock()
+	if ok {
+		return cached, nil
+	}
+
+	manifest, err := vf.getManifest()
+	if err != nil {
+		return nil, err
 	}
 
 	// Find version in manifest
@@ -80,26 +122,28 @@ func (vf *VersionFetcher) GetServerDownloadURL(version string) (string, error) {
 	}
 
 	if versionURL == "" {
-		return "", fmt.Errorf("version %s not found", version)
+		return nil, fmt.Errorf("version %s not found", version)
 	}
 
-	// Fetch version details
-	resp, err := http.Get(versionURL)
+	resp, err := detailsClient.Get(versionURL)
 	if err != nil {
-		return "", fmt.Errorf("failed to fetch version details: %w", err)
+		return nil, fmt.Errorf("failed to fetch version details: %w", err)
 	}
 	defer resp.Body.Close()
 
 	var details VersionDetails
 	if err := json.NewDecoder(resp.Body).Decode(&details); err != nil {
-		return "", fmt.Errorf("failed to parse version details: %w", err)
+		return nil, fmt.Errorf("failed to parse version details: %w", err)
 	}
 
-	if details.Downloads.Server.URL == "" {
-		return "", fmt.Errorf("server download not available for version %s", version)
+	vf.detailsMu.Lock()
+	if vf.details == nil {
+		vf.details = make(map[string]*VersionDetails)
 	}
+	vf.details[version] = &details
+	vf.detailsMu.Unlock()
 
-	return details.Downloads.Server.URL, nil
+	return &details, nil
 }
 
 func (vf *VersionFetcher) getManifest() (*VersionManifest, error) {

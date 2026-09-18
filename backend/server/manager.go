@@ -169,7 +169,9 @@ func (m *Manager) StartServer(id string) error {
 
 	// Get start command from provider
 	serverDir := m.getServerDir(id)
-	cmd := "java"
+	// Minecraft versions require different Java runtimes (26.x needs Java 25),
+	// so resolve the interpreter from the server's version.
+	cmd := minecraft.JavaCommandForVersion(server.Version)
 	args := []string{
 		fmt.Sprintf("-Xmx%dM", m.config.MemoryMB),
 		fmt.Sprintf("-Xms%dM", m.config.MemoryMB),
@@ -177,9 +179,10 @@ func (m *Manager) StartServer(id string) error {
 	}
 	if m.registry != nil {
 		if provider, ok := m.registry.GetProvider(server.Flavor); ok {
-			cmd, args = provider.StartCommand(serverDir, m.config.MemoryMB)
+			cmd, args = provider.StartCommand(serverDir, m.config.MemoryMB, server.Version)
 		}
 	}
+	log.Printf("Starting server %s (%s %s) with %s", id, server.Flavor, server.Version, cmd)
 
 	// Start process
 	process, err := StartProcess(serverDir, server.Port, cmd, args)

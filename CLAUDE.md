@@ -106,10 +106,11 @@ This document provides context for AI assistants (like Claude) working on the Re
 **Server Start**:
 1. POST /api/servers/:id/start
 2. Check max running limit
-3. Fork process: `java -Xmx{memory}M -jar server.jar nogui`
-4. Capture PID, track status
-5. Stream logs via WebSocket
-6. Update status to "running"
+3. Resolve the Java runtime for the server's version (see "Java Runtime Selection")
+4. Fork process: `<java> -Xmx{memory}M -jar server.jar nogui`
+5. Capture PID, track status
+6. Stream logs via WebSocket
+7. Update status to "running"
 
 **Log Streaming**:
 1. WebSocket connection to /api/ws/:id
@@ -175,6 +176,38 @@ REALMRUNNER_BASE_URL=realmrunner.ziniewicz.eu  # Display domain
 ```
 
 ## Key Algorithms & Logic
+
+### Java Runtime Selection
+
+Minecraft versions require different Java releases, and running a jar on a too-old JVM makes the
+server exit immediately with `UnsupportedClassVersionError`:
+
+| Minecraft version | Java |
+|---|---|
+| 26.x (year-based scheme) | 25 |
+| 1.20.5 - 1.21.x | 21 |
+| 1.17 - 1.20.4 | 17 |
+| 1.16.5 and older | 8 |
+
+1. Ask upstream first: Mojang's version manifest reports `javaVersion.majorVersion`, PaperMC's v3
+   API reports `java.version.minimum`
+2. Fall back to the table above (`minecraft.RequiredJavaMajor`) when upstream is unreachable
+3. Resolve a binary (`minecraft.JavaCommand`): `$REALMRUNNER_JAVA_<major>`, then
+   `/opt/java/<major>/bin/java` or `/usr/lib/jvm/*`, then the oldest installed runtime that is new
+   enough, then plain `java` from PATH
+
+### Upstream APIs
+
+| Purpose | Endpoint |
+|---|---|
+| Vanilla versions/downloads | `https://piston-meta.mojang.com/mc/game/version_manifest_v2.json` |
+| Paper versions/builds | `https://fill.papermc.io/v3/projects/paper` (v2 was sunset) |
+| Purpur versions/builds | `https://api.purpurmc.org/v2/purpur` |
+| Username -> UUID | `https://api.minecraftservices.com/minecraft/profile/lookup/name/{name}` (legacy `api.mojang.com` used as fallback) |
+| Mods | `https://api.modrinth.com/v2` |
+
+`go test ./minecraft/ -run TestLive` with `REALMRUNNER_LIVE_TESTS=1` checks these against the real
+APIs; CI runs it weekly so a sunset endpoint surfaces before users hit it.
 
 ### Port Validation
 1. Parse range from env var (e.g., "25565-25600")
@@ -288,9 +321,10 @@ REALMRUNNER_BASE_URL=realmrunner.ziniewicz.eu  # Display domain
 ## Docker Build
 
 Multi-stage Dockerfile:
-1. **Stage 1**: Build Vue frontend (node:20-alpine)
-2. **Stage 2**: Build Go backend (golang:1.21)
-3. **Stage 3**: Runtime (eclipse-temurin:21-jre)
+1. **Stage 1**: Build Vue frontend (node:22-alpine)
+2. **Stage 2**: Build Go backend (golang:1.25)
+3. **Stage 3**: Runtime (eclipse-temurin:25-jre, with Java 21 copied to /opt/java/21)
+   - Ship both JREs side by side: Minecraft 26.x requires Java 25, 1.20.5-1.21.x run on Java 21
    - Copy built static files from stage 1
    - Copy Go binary from stage 2
    - Install ca-certificates for HTTPS
@@ -373,6 +407,9 @@ Environment variables (`REALMRUNNER_PASSWORD_HASH`, `REALMRUNNER_JWT_SECRET`) ar
 
 - **v0.1.0**: Initial design and specification (2025-10-10)
 - **v0.2.0**: Komodo deployment with Traefik SSL termination (2026-03-11)
+- **v1.1.0**: Tag of the last main before 2.0 (Java 21 only, Paper API v2)
+- **v2.0.0**: Minecraft 26.x support (Java 25 runtime + per-version Java selection), PaperMC v3
+  API migration, modern Mojang profile lookup, backend test suite (2026-09-18)
 
 ---
 

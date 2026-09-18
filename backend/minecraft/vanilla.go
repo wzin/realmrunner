@@ -48,12 +48,14 @@ func (p *VanillaProvider) DownloadServer(destDir string, version string) error {
 	return downloadJar(downloadURL, jarPath, fmt.Sprintf("Vanilla %s", version))
 }
 
-func (p *VanillaProvider) StartCommand(serverDir string, memoryMB int) (string, []string) {
-	return "java", []string{
-		fmt.Sprintf("-Xmx%dM", memoryMB),
-		fmt.Sprintf("-Xms%dM", memoryMB),
-		"-jar", "server.jar", "nogui",
+func (p *VanillaProvider) StartCommand(serverDir string, memoryMB int, version string) (string, []string) {
+	major := RequiredJavaMajor(version)
+	// The Mojang manifest states the required Java version per release; prefer
+	// it over our heuristic so future versions keep working.
+	if reported, err := p.fetcher.GetJavaMajor(version); err == nil && reported > 0 {
+		major = reported
 	}
+	return JavaCommand(major), javaArgs(memoryMB)
 }
 
 // downloadJar is a shared helper for downloading JAR files

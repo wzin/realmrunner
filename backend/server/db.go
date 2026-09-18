@@ -11,19 +11,19 @@ import (
 )
 
 type Server struct {
-	ID            string     `json:"id"`
-	Name          string     `json:"name"`
-	Version       string     `json:"version"`
-	Flavor        string     `json:"flavor"`
-	Port          int        `json:"port"`
-	Status        string     `json:"status"`
+	ID              string     `json:"id"`
+	Name            string     `json:"name"`
+	Version         string     `json:"version"`
+	Flavor          string     `json:"flavor"`
+	Port            int        `json:"port"`
+	Status          string     `json:"status"`
 	CPULimit        float64    `json:"cpu_limit"`
 	MemoryLimitMB   int        `json:"memory_limit_mb"`
 	RestartSchedule string     `json:"restart_schedule"`
 	Ready           bool       `json:"ready"`
 	ShareToken      string     `json:"share_token,omitempty"`
-	CreatedAt     time.Time  `json:"created_at"`
-	LastStartedAt *time.Time `json:"last_started_at,omitempty"`
+	CreatedAt       time.Time  `json:"created_at"`
+	LastStartedAt   *time.Time `json:"last_started_at,omitempty"`
 }
 
 const (
