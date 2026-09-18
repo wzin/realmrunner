@@ -39,7 +39,7 @@
 </template>
 
 <script setup>
-import { ref, onMounted, nextTick, watch } from 'vue'
+import { ref, onMounted, onUnmounted, nextTick, watch } from 'vue'
 import { api } from '../api/client'
 import uPlot from 'uplot'
 import 'uplot/dist/uPlot.min.css'
@@ -139,6 +139,14 @@ async function loadData() {
   renderCharts()
 }
 
+// Charts are sized from their container when they are built, so they have to be
+// rebuilt when the window changes size - a phone rotating, for instance.
+let resizeTimer = null
+function handleResize() {
+  clearTimeout(resizeTimer)
+  resizeTimer = setTimeout(renderCharts, 150)
+}
+
 function renderCharts() {
   destroyCharts()
   if (!points.value.length) return
@@ -166,6 +174,13 @@ function selectRange(r) {
 
 onMounted(() => {
   loadData()
+  window.addEventListener('resize', handleResize)
+})
+
+onUnmounted(() => {
+  window.removeEventListener('resize', handleResize)
+  clearTimeout(resizeTimer)
+  destroyCharts()
 })
 </script>
 

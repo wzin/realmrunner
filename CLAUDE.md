@@ -485,6 +485,23 @@ Multi-stage Dockerfile:
    - Expose port 8080
    - Set CMD to backend binary
 
+## Small Screens
+
+The app is used from phones, so the layout has to hold at ~390px wide:
+
+- `.server-grid` sizes its columns with `minmax(min(350px, 100%), 1fr)`; a fixed
+  350px minimum makes the whole page scroll sideways on a phone
+- Modals become full-screen sheets below 768px. Scoped component styles compile
+  to a higher specificity than the global rules, so those overrides in
+  `style.css` are marked important deliberately
+- The dashboard header stacks, and its buttons share the width
+- Tables sit in `.table-scroll` containers so they scroll instead of the page
+- Inputs are 16px on small screens, which stops mobile browsers zooming in on
+  focus, and buttons get a 2.25-2.5rem minimum height for tapping
+
+Check with a phone-sized viewport that `document.documentElement.scrollWidth`
+equals `clientWidth`: anything wider means something is overflowing.
+
 ## Static Assets and Caching
 
 The frontend build gives each asset a content hash, so `/assets/*` is served
@@ -531,7 +548,24 @@ The `compose.yaml` includes:
 
 Environment variables (`REALMRUNNER_PASSWORD_HASH`, `REALMRUNNER_JWT_SECRET`) are set in Komodo's stack configuration. Use unescaped bcrypt hashes in Komodo's UI.
 
-### Static Assets and Caching
+### Small Screens
+
+The app is used from phones, so the layout has to hold at ~390px wide:
+
+- `.server-grid` sizes its columns with `minmax(min(350px, 100%), 1fr)`; a fixed
+  350px minimum makes the whole page scroll sideways on a phone
+- Modals become full-screen sheets below 768px. Scoped component styles compile
+  to a higher specificity than the global rules, so those overrides in
+  `style.css` are marked important deliberately
+- The dashboard header stacks, and its buttons share the width
+- Tables sit in `.table-scroll` containers so they scroll instead of the page
+- Inputs are 16px on small screens, which stops mobile browsers zooming in on
+  focus, and buttons get a 2.25-2.5rem minimum height for tapping
+
+Check with a phone-sized viewport that `document.documentElement.scrollWidth`
+equals `clientWidth`: anything wider means something is overflowing.
+
+## Static Assets and Caching
 
 The frontend build gives each asset a content hash, so `/assets/*` is served
 `public, max-age=31536000, immutable`, while `index.html` - which names those
@@ -637,6 +671,8 @@ the login page show it, so a deployment can be confirmed at a glance.
   deployment; version shown in the dashboard and on the login page (2026-09-18)
 - **v2.4.0**: VERSION file so compose (Komodo) builds stamp the real version instead of "dev",
   plus scripts/release.sh (2026-09-18)
+- **v2.5.0**: Phone layout - responsive grid, full-screen modal sheets, stacking header, scrolling
+  tables, tap-friendly controls (2026-09-18)
 
 ---
 

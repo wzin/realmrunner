@@ -101,6 +101,12 @@ onUnmounted(() => clearInterval(timer))
 .player { display: flex; align-items: center; justify-content: space-between; gap: 0.5rem; padding: 0.5rem 0; border-bottom: 1px solid var(--border); flex-wrap: wrap; }
 .player-name { font-weight: 600; }
 .player-actions { display: flex; gap: 0.25rem; flex-wrap: wrap; }
+
+@media (max-width: 480px) {
+  .player { align-items: flex-start; flex-direction: column; gap: 0.35rem; }
+  .player-actions { width: 100%; }
+  .player-actions .btn { flex: 1; }
+}
 .server-reply { margin-top: 1rem; font-size: 0.8125rem; color: var(--text-muted); white-space: pre-wrap; }
 .modal-actions { display: flex; gap: 1rem; justify-content: flex-end; margin-top: 1.5rem; }
 </style>

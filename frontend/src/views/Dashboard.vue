@@ -382,12 +382,37 @@ onMounted(() => {
   display: flex;
   justify-content: space-between;
   align-items: center;
+  flex-wrap: wrap;
+  gap: 1rem;
 }
 
 .header-right {
   display: flex;
   align-items: center;
   gap: 1rem;
+  flex-wrap: wrap;
+}
+
+@media (max-width: 768px) {
+  .header {
+    padding: 1rem 0;
+    margin-bottom: 1rem;
+  }
+
+  .header-content {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+
+  .header-right {
+    width: 100%;
+    gap: 0.5rem;
+  }
+
+  .header-right .btn {
+    flex: 1;
+    min-width: 5.5rem;
+  }
 }
 
 .title {
@@ -416,7 +441,9 @@ onMounted(() => {
 
 .server-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(350px, 1fr));
+  /* min() keeps the column from being wider than the screen: a fixed 350px
+     minimum makes the whole page scroll sideways on a phone. */
+  grid-template-columns: repeat(auto-fill, minmax(min(350px, 100%), 1fr));
   gap: 1.5rem;
 }
 </style>
