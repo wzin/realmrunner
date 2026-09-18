@@ -10,7 +10,6 @@ import (
 	"testing"
 
 	"github.com/gin-gonic/gin"
-	"golang.org/x/crypto/bcrypt"
 	"github.com/wzin/realmrunner/auth"
 	"github.com/wzin/realmrunner/backup"
 	"github.com/wzin/realmrunner/cgroup"
@@ -19,6 +18,7 @@ import (
 	"github.com/wzin/realmrunner/minecraft"
 	"github.com/wzin/realmrunner/server"
 	"github.com/wzin/realmrunner/websocket"
+	"golang.org/x/crypto/bcrypt"
 )
 
 func setupTestEnv(t *testing.T) (*gin.Engine, string, func()) {
