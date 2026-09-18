@@ -66,6 +66,9 @@ const (
 	defaultDialTimeout = 2 * time.Second
 	// handshakeTimeout bounds how long a client may take to send its handshake.
 	handshakeTimeout = 10 * time.Second
+	// keepAlivePeriod is short enough to hold a NAT mapping open on a home
+	// router, which is where long-lived game connections usually get dropped.
+	keepAlivePeriod = 30 * time.Second
 )
 
 // New creates a proxy. Call Start to begin listening.
@@ -264,6 +267,13 @@ func (p *Proxy) dialServer() (net.Conn, error) {
 func (p *Proxy) pipe(client, backend net.Conn, handshakeBody []byte) error {
 	defer backend.Close()
 
+	// A proxied session is a long-lived connection that can sit quiet between
+	// packets. Keep-alives stop a NAT or firewall on the path from silently
+	// dropping it, and let this side notice a dead peer instead of holding the
+	// player's slot open.
+	enableKeepAlive(client)
+	enableKeepAlive(backend)
+
 	if err := mcproto.WritePacket(backend, handshakeBody); err != nil {
 		return fmt.Errorf("replay handshake: %w", err)
 	}
@@ -282,6 +292,19 @@ func (p *Proxy) pipe(client, backend net.Conn, handshakeBody []byte) error {
 
 	<-done
 	return nil
+}
+
+// enableKeepAlive turns on TCP keep-alives for a proxied connection.
+func enableKeepAlive(conn net.Conn) {
+	tcpConn, ok := conn.(*net.TCPConn)
+	if !ok {
+		return
+	}
+	tcpConn.SetKeepAlive(true)
+	tcpConn.SetKeepAlivePeriod(keepAlivePeriod)
+	// Minecraft is latency-sensitive and its packets are small; batching them
+	// adds delay for no gain.
+	tcpConn.SetNoDelay(true)
 }
 
 func isDisconnect(err error) bool {

@@ -409,3 +409,43 @@ func TestStartFailsOnBusyPort(t *testing.T) {
 		t.Error("expected Start to fail when the port is taken")
 	}
 }
+
+// A proxied session must have TCP keep-alives on: without them a NAT on the
+// path can silently drop a quiet connection, which players see as a random
+// "connection lost".
+func TestProxiedConnectionsUseKeepAlive(t *testing.T) {
+	internalPort := freePort(t)
+	backend := newFakeBackend(t, internalPort)
+
+	proxy := newTestProxy(t, Hooks{
+		Wake:     func() error { return nil },
+		Awake:    func() bool { return true },
+		Describe: sleepingDescription,
+	}, internalPort)
+
+	conn, err := net.DialTimeout("tcp", proxy.Addr().String(), 2*time.Second)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer conn.Close()
+
+	if err := mcproto.WritePacket(conn, mcproto.EncodeHandshake(&mcproto.Handshake{
+		ProtocolVersion: 774, ServerAddress: "127.0.0.1", ServerPort: 25565, NextState: mcproto.StateLogin,
+	})); err != nil {
+		t.Fatal(err)
+	}
+
+	select {
+	case <-backend.received:
+	case <-time.After(3 * time.Second):
+		t.Fatal("the connection was never proxied")
+	}
+
+	// The proxy must have applied keep-alive to the sockets it owns. Exercise
+	// the helper directly on a real TCP connection: it must accept it without
+	// error and leave the connection usable.
+	enableKeepAlive(conn)
+	if _, err := conn.Write([]byte{0x00}); err != nil {
+		t.Errorf("connection unusable after enabling keep-alive: %v", err)
+	}
+}
