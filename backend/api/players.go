@@ -155,3 +155,44 @@ func (h *Handlers) SleepServer(c *gin.Context) {
 
 	c.JSON(http.StatusOK, gin.H{"message": "server sleeping"})
 }
+
+type heapRequest struct {
+	HeapMB int `json:"heap_mb"`
+}
+
+// GetDiagnostics summarises what the server's log says about connection
+// quality: who dropped, why, and whether the server was stalling at the time.
+func (h *Handlers) GetDiagnostics(c *gin.Context) {
+	id := c.Param("id")
+
+	diag, err := h.manager.Diagnose(id)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+
+	c.JSON(http.StatusOK, diag)
+}
+
+// SetHeap changes the Java heap for one server.
+func (h *Handlers) SetHeap(c *gin.Context) {
+	id := c.Param("id")
+
+	var req heapRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid request"})
+		return
+	}
+
+	if err := h.manager.SetHeapMB(id, req.HeapMB); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+
+	srv, err := h.manager.GetServer(id)
+	if err != nil {
+		c.JSON(http.StatusNotFound, gin.H{"error": "server not found"})
+		return
+	}
+	c.JSON(http.StatusOK, h.makeServerResponse(srv))
+}

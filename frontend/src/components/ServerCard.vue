@@ -79,6 +79,7 @@
         <button v-if="server.status === 'running'" @click="$emit('online', server)" class="btn btn-secondary btn-sm">Who's Online</button>
         <button v-if="server.status === 'stopped'" @click="$emit('console', server)" class="btn btn-secondary btn-sm">View Logs</button>
         <button @click="$emit('metrics', server)" class="btn btn-secondary btn-sm">Metrics</button>
+        <button @click="$emit('diagnostics', server)" class="btn btn-secondary btn-sm" title="Who dropped, why, and whether the server was stalling">Connection Health</button>
       </div>
     </div>
 
@@ -128,7 +129,7 @@ const props = defineProps({
   }
 })
 
-const emit = defineEmits(['refresh', 'console', 'metrics', 'upgrade', 'limits', 'files', 'players', 'online', 'backups', 'mods', 'schedule', 'sleep', 'share', 'viewers'])
+const emit = defineEmits(['refresh', 'console', 'metrics', 'diagnostics', 'upgrade', 'limits', 'files', 'players', 'online', 'backups', 'mods', 'schedule', 'sleep', 'share', 'viewers'])
 
 const loading = ref(false)
 const error = ref('')

@@ -52,6 +52,7 @@
           @files="openFiles"
           @players="openPlayers"
           @online="openOnline"
+          @diagnostics="openDiagnostics"
           @sleep="openSleep"
           @backups="openBackups"
           @mods="openMods"
@@ -98,6 +99,12 @@
       v-if="filesServer"
       :server="filesServer"
       @close="filesServer = null"
+    />
+
+    <DiagnosticsModal
+      v-if="diagnosticsServer"
+      :server="diagnosticsServer"
+      @close="diagnosticsServer = null"
     />
 
     <OnlinePlayersModal
@@ -182,6 +189,7 @@ import LimitsModal from '../components/LimitsModal.vue'
 import FileEditorModal from '../components/FileEditorModal.vue'
 import WhitelistModal from '../components/WhitelistModal.vue'
 import OnlinePlayersModal from '../components/OnlinePlayersModal.vue'
+import DiagnosticsModal from '../components/DiagnosticsModal.vue'
 import SleepModal from '../components/SleepModal.vue'
 import BackupsModal from '../components/BackupsModal.vue'
 import ModsModal from '../components/ModsModal.vue'
@@ -207,6 +215,7 @@ const limitsServer = ref(null)
 const filesServer = ref(null)
 const playersServer = ref(null)
 const onlineServer = ref(null)
+const diagnosticsServer = ref(null)
 const sleepServer = ref(null)
 const backupsServer = ref(null)
 const modsServer = ref(null)
@@ -306,6 +315,10 @@ function openPlayers(server) {
 
 function openOnline(server) {
   onlineServer.value = server
+}
+
+function openDiagnostics(server) {
+  diagnosticsServer.value = server
 }
 
 function openSleep(server) {

@@ -120,6 +120,10 @@ func RegisterRoutes(
 	protected.POST("/servers/:id/wake", handlers.WakeServer)
 	protected.POST("/servers/:id/sleep", handlers.SleepServer)
 
+	// Connection diagnostics and heap size
+	protected.GET("/servers/:id/diagnostics", handlers.GetDiagnostics)
+	protected.PUT("/servers/:id/heap", handlers.SetHeap)
+
 	// Metrics endpoints
 	protected.GET("/servers/:id/metrics", handlers.GetServerMetrics)
 	protected.GET("/servers/:id/metrics/history", handlers.GetServerMetricsHistory)
