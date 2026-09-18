@@ -24,6 +24,23 @@ type Server struct {
 	ShareToken      string     `json:"share_token,omitempty"`
 	CreatedAt       time.Time  `json:"created_at"`
 	LastStartedAt   *time.Time `json:"last_started_at,omitempty"`
+
+	// RCON control channel. The port is bound on loopback only and is never
+	// published by the container.
+	RCONPort     int    `json:"rcon_port"`
+	RCONPassword string `json:"-"`
+
+	// Auto-sleep. InternalPort is where the Minecraft server actually listens
+	// when the port is fronted by RealmRunner's proxy; Port stays the address
+	// players connect to.
+	AutoSleep      bool `json:"auto_sleep"`
+	IdleTimeoutMin int  `json:"idle_timeout_min"`
+	InternalPort   int  `json:"internal_port"`
+
+	// Crash handling.
+	AutoRestart  bool   `json:"auto_restart"`
+	LastExitCode int    `json:"last_exit_code"`
+	LastError    string `json:"last_error,omitempty"`
 }
 
 const (
@@ -31,6 +48,11 @@ const (
 	StatusStarting = "starting"
 	StatusRunning  = "running"
 	StatusStopping = "stopping"
+	// StatusSleeping means the server is stopped but its port is held by the
+	// proxy, which will start it when a player connects.
+	StatusSleeping = "sleeping"
+	// StatusCrashed means the process exited on its own without being asked to.
+	StatusCrashed = "crashed"
 )
 
 func InitDB(dataDir string) (*sql.DB, error) {
@@ -69,21 +91,32 @@ func InitDB(dataDir string) (*sql.DB, error) {
 	db.Exec("ALTER TABLE servers ADD COLUMN restart_schedule TEXT DEFAULT ''")
 	db.Exec("ALTER TABLE servers ADD COLUMN ready INTEGER DEFAULT 0")
 	db.Exec("ALTER TABLE servers ADD COLUMN share_token TEXT DEFAULT ''")
+	db.Exec("ALTER TABLE servers ADD COLUMN rcon_port INTEGER DEFAULT 0")
+	db.Exec("ALTER TABLE servers ADD COLUMN rcon_password TEXT DEFAULT ''")
+	db.Exec("ALTER TABLE servers ADD COLUMN auto_sleep INTEGER DEFAULT 0")
+	db.Exec("ALTER TABLE servers ADD COLUMN idle_timeout_min INTEGER DEFAULT 15")
+	db.Exec("ALTER TABLE servers ADD COLUMN internal_port INTEGER DEFAULT 0")
+	db.Exec("ALTER TABLE servers ADD COLUMN auto_restart INTEGER DEFAULT 1")
+	db.Exec("ALTER TABLE servers ADD COLUMN last_exit_code INTEGER DEFAULT 0")
+	db.Exec("ALTER TABLE servers ADD COLUMN last_error TEXT DEFAULT ''")
 
 	return db, nil
 }
 
 func CreateServer(db *sql.DB, server *Server) error {
 	query := `
-	INSERT INTO servers (id, name, version, flavor, port, status, created_at)
-	VALUES (?, ?, ?, ?, ?, ?, ?)
+	INSERT INTO servers (id, name, version, flavor, port, status, created_at,
+	                     rcon_port, rcon_password, internal_port, idle_timeout_min, auto_restart)
+	VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
 	`
-	_, err := db.Exec(query, server.ID, server.Name, server.Version, server.Flavor, server.Port, server.Status, server.CreatedAt)
+	_, err := db.Exec(query, server.ID, server.Name, server.Version, server.Flavor, server.Port,
+		server.Status, server.CreatedAt, server.RCONPort, server.RCONPassword, server.InternalPort,
+		server.IdleTimeoutMin, server.AutoRestart)
 	return err
 }
 
 func GetServer(db *sql.DB, id string) (*Server, error) {
-	query := `SELECT id, name, version, flavor, port, status, cpu_limit, memory_limit_mb, restart_schedule, ready, share_token, created_at, last_started_at FROM servers WHERE id = ?`
+	query := `SELECT id, name, version, flavor, port, status, cpu_limit, memory_limit_mb, restart_schedule, ready, share_token, created_at, last_started_at, rcon_port, rcon_password, auto_sleep, idle_timeout_min, internal_port, auto_restart, last_exit_code, last_error FROM servers WHERE id = ?`
 	server := &Server{}
 	err := db.QueryRow(query, id).Scan(
 		&server.ID,
@@ -99,6 +132,14 @@ func GetServer(db *sql.DB, id string) (*Server, error) {
 		&server.ShareToken,
 		&server.CreatedAt,
 		&server.LastStartedAt,
+		&server.RCONPort,
+		&server.RCONPassword,
+		&server.AutoSleep,
+		&server.IdleTimeoutMin,
+		&server.InternalPort,
+		&server.AutoRestart,
+		&server.LastExitCode,
+		&server.LastError,
 	)
 	if err == sql.ErrNoRows {
 		return nil, fmt.Errorf("server not found")
@@ -107,7 +148,7 @@ func GetServer(db *sql.DB, id string) (*Server, error) {
 }
 
 func GetAllServers(db *sql.DB) ([]*Server, error) {
-	query := `SELECT id, name, version, flavor, port, status, cpu_limit, memory_limit_mb, restart_schedule, ready, share_token, created_at, last_started_at FROM servers ORDER BY created_at DESC`
+	query := `SELECT id, name, version, flavor, port, status, cpu_limit, memory_limit_mb, restart_schedule, ready, share_token, created_at, last_started_at, rcon_port, rcon_password, auto_sleep, idle_timeout_min, internal_port, auto_restart, last_exit_code, last_error FROM servers ORDER BY created_at DESC`
 	rows, err := db.Query(query)
 	if err != nil {
 		return nil, err
@@ -131,6 +172,14 @@ func GetAllServers(db *sql.DB) ([]*Server, error) {
 			&server.ShareToken,
 			&server.CreatedAt,
 			&server.LastStartedAt,
+			&server.RCONPort,
+			&server.RCONPassword,
+			&server.AutoSleep,
+			&server.IdleTimeoutMin,
+			&server.InternalPort,
+			&server.AutoRestart,
+			&server.LastExitCode,
+			&server.LastError,
 		)
 		if err != nil {
 			return nil, err
@@ -222,4 +271,52 @@ func CountRunningServers(db *sql.DB) (int, error) {
 	var count int
 	err := db.QueryRow(query, StatusRunning).Scan(&count)
 	return count, err
+}
+
+// SetRCONCredentials stores the control-channel port and password for a server.
+func SetRCONCredentials(db *sql.DB, id string, port int, password string) error {
+	_, err := db.Exec("UPDATE servers SET rcon_port = ?, rcon_password = ? WHERE id = ?", port, password, id)
+	return err
+}
+
+// SetInternalPort records the port the Minecraft process itself listens on,
+// which differs from the advertised port while the proxy fronts it.
+func SetInternalPort(db *sql.DB, id string, port int) error {
+	_, err := db.Exec("UPDATE servers SET internal_port = ? WHERE id = ?", port, id)
+	return err
+}
+
+// SetAutoSleep enables or disables idle shutdown and sets the idle timeout.
+func SetAutoSleep(db *sql.DB, id string, enabled bool, idleTimeoutMin int) error {
+	if idleTimeoutMin <= 0 {
+		idleTimeoutMin = 15
+	}
+	_, err := db.Exec("UPDATE servers SET auto_sleep = ?, idle_timeout_min = ? WHERE id = ?", enabled, idleTimeoutMin, id)
+	return err
+}
+
+// SetAutoRestart controls whether a crashed server is restarted automatically.
+func SetAutoRestart(db *sql.DB, id string, enabled bool) error {
+	_, err := db.Exec("UPDATE servers SET auto_restart = ? WHERE id = ?", enabled, id)
+	return err
+}
+
+// RecordExit stores how a server process ended, so the UI can explain a crash
+// instead of silently showing "stopped".
+func RecordExit(db *sql.DB, id string, exitCode int, message string) error {
+	_, err := db.Exec("UPDATE servers SET last_exit_code = ?, last_error = ? WHERE id = ?", exitCode, message, id)
+	return err
+}
+
+// ClearLastError resets the recorded failure, used when a server starts cleanly.
+func ClearLastError(db *sql.DB, id string) error {
+	_, err := db.Exec("UPDATE servers SET last_exit_code = 0, last_error = '' WHERE id = ?", id)
+	return err
+}
+
+// InternalPortExists reports whether another server already uses an internal port.
+func InternalPortExists(db *sql.DB, port int) (bool, error) {
+	var count int
+	err := db.QueryRow("SELECT COUNT(*) FROM servers WHERE internal_port = ? OR port = ? OR rcon_port = ?", port, port, port).Scan(&count)
+	return count > 0, err
 }

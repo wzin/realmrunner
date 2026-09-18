@@ -106,6 +106,20 @@ func RegisterRoutes(
 	protected.POST("/servers/:id/ops", handlers.AddOp)
 	protected.DELETE("/servers/:id/ops/:uuid", handlers.RemoveOp)
 
+	// Players (live control over RCON)
+	protected.GET("/servers/:id/players", handlers.ListPlayers)
+	protected.POST("/servers/:id/players/kick", handlers.KickPlayer)
+	protected.POST("/servers/:id/players/ban", handlers.BanPlayer)
+	protected.POST("/servers/:id/players/pardon", handlers.PardonPlayer)
+	protected.POST("/servers/:id/players/op", handlers.OpPlayer)
+	protected.POST("/servers/:id/players/deop", handlers.DeopPlayer)
+
+	// Auto-sleep and crash handling
+	protected.PUT("/servers/:id/autosleep", handlers.SetAutoSleep)
+	protected.PUT("/servers/:id/autorestart", handlers.SetAutoRestart)
+	protected.POST("/servers/:id/wake", handlers.WakeServer)
+	protected.POST("/servers/:id/sleep", handlers.SleepServer)
+
 	// Metrics endpoints
 	protected.GET("/servers/:id/metrics", handlers.GetServerMetrics)
 	protected.GET("/servers/:id/metrics/history", handlers.GetServerMetricsHistory)

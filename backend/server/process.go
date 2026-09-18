@@ -19,6 +19,10 @@ type Process struct {
 	stdout io.ReadCloser
 	stderr io.ReadCloser
 	mu     sync.Mutex
+
+	// stopRequested distinguishes an operator-initiated shutdown from a crash.
+	stopRequested bool
+	startedAt     time.Time
 }
 
 func StartProcess(serverDir string, port int, command string, args []string) (*Process, error) {
@@ -70,10 +74,11 @@ func StartProcess(serverDir string, port int, command string, args []string) (*P
 	}
 
 	process := &Process{
-		cmd:    cmd,
-		stdin:  stdin,
-		stdout: stdout,
-		stderr: stderr,
+		cmd:       cmd,
+		stdin:     stdin,
+		stdout:    stdout,
+		stderr:    stderr,
+		startedAt: time.Now(),
 	}
 
 	// Start log capture to file
@@ -85,6 +90,8 @@ func StartProcess(serverDir string, port int, command string, args []string) (*P
 func (p *Process) Stop() error {
 	p.mu.Lock()
 	defer p.mu.Unlock()
+
+	p.stopRequested = true
 
 	if p.cmd == nil || p.cmd.Process == nil {
 		return nil // Already stopped
@@ -115,6 +122,8 @@ func (p *Process) Stop() error {
 func (p *Process) ForceKill() {
 	p.mu.Lock()
 	defer p.mu.Unlock()
+
+	p.stopRequested = true
 	if p.cmd != nil && p.cmd.Process != nil {
 		p.cmd.Process.Signal(syscall.SIGKILL)
 	}
@@ -212,6 +221,19 @@ func (p *Process) TailLogs(serverDir string) (<-chan string, error) {
 	}()
 
 	return ch, nil
+}
+
+// StopRequested reports whether this process was asked to shut down, as opposed
+// to exiting on its own.
+func (p *Process) StopRequested() bool {
+	p.mu.Lock()
+	defer p.mu.Unlock()
+	return p.stopRequested
+}
+
+// Uptime is how long the process has been running.
+func (p *Process) Uptime() time.Duration {
+	return time.Since(p.startedAt)
 }
 
 // PID returns the process ID, or 0 if not running
