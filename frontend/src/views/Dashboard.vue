@@ -4,7 +4,10 @@
       <div class="container">
         <div class="header-content">
           <div>
-            <h1 class="title pixel-font">RealmRunner</h1>
+            <h1 class="title pixel-font">
+              RealmRunner
+              <span v-if="appVersion" class="version-badge" :title="versionTitle">{{ appVersion }}</span>
+            </h1>
             <p class="subtitle">Minecraft Server Manager</p>
           </div>
           <div class="header-right">
@@ -213,6 +216,8 @@ const metricsServer = ref(null)
 const upgradeServer = ref(null)
 const limitsServer = ref(null)
 const filesServer = ref(null)
+const appVersion = ref('')
+const versionTitle = ref('')
 const playersServer = ref(null)
 const onlineServer = ref(null)
 const diagnosticsServer = ref(null)
@@ -250,6 +255,16 @@ async function handleChangePassword() {
     setTimeout(() => { showPasswordModal.value = false; passwordSaved.value = false }, 1500)
   } catch (err) {
     passwordError.value = err.message || 'Failed to change password'
+  }
+}
+
+async function loadVersion() {
+  try {
+    const info = await api.getVersion()
+    appVersion.value = info.version
+    versionTitle.value = info.commit ? `commit ${info.commit}` : ''
+  } catch {
+    // The version is decoration; never let it break the dashboard.
   }
 }
 
@@ -336,12 +351,25 @@ function handleLimitsSaved() {
 
 onMounted(() => {
   loadServers()
+  loadVersion()
   // Refresh servers every 5 seconds
   setInterval(loadServers, 5000)
 })
 </script>
 
 <style scoped>
+.version-badge {
+  font-family: 'Press Start 2P', monospace;
+  font-size: 0.4rem;
+  vertical-align: middle;
+  margin-left: 0.5rem;
+  padding: 0.25rem 0.4rem;
+  border: 1px solid var(--border);
+  border-radius: 3px;
+  color: var(--text-muted);
+  white-space: nowrap;
+}
+
 .header {
   background: var(--bg-header);
   border-bottom: 2px solid var(--border);

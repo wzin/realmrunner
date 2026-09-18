@@ -109,6 +109,9 @@ export const api = {
   wakeServer: (id) => request(`/servers/${id}/wake`, { method: 'POST' }),
   sleepServer: (id) => request(`/servers/${id}/sleep`, { method: 'POST' }),
 
+  // Build identity
+  getVersion: () => request('/version'),
+
   // Connection diagnostics and heap size
   getDiagnostics: (id) => request(`/servers/${id}/diagnostics`),
   setHeap: (id, heapMB) => request(`/servers/${id}/heap`, { method: 'PUT', body: JSON.stringify({ heap_mb: heapMB }) }),

@@ -20,6 +20,9 @@ func RegisterRoutes(
 	// Auth endpoints (no auth required)
 	api.POST("/auth/login", authMiddleware.Login)
 
+	// Build identity (no auth required, so the login page can show it)
+	api.GET("/version", GetVersion)
+
 	// Public share endpoints (no auth required)
 	shareHandlers := NewHandlers(manager, hub, cfg)
 	api.GET("/share/:token", shareHandlers.GetSharedServer)

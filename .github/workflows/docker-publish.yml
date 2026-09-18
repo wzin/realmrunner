@@ -87,6 +87,9 @@ jobs:
           push: ${{ github.event_name != 'pull_request' }}
           tags: ${{ steps.meta.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}
+          build-args: |
+            VERSION=${{ github.ref_type == 'tag' && github.ref_name || format('main-{0}', github.sha) }}
+            COMMIT=${{ github.sha }}
 
   upstream-api-check:
     runs-on: ubuntu-latest

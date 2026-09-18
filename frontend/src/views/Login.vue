@@ -38,12 +38,14 @@
           {{ loading ? 'Logging in...' : 'Login' }}
         </button>
       </form>
+
+      <p v-if="appVersion" class="login-version">{{ appVersion }}</p>
     </div>
   </div>
 </template>
 
 <script setup>
-import { ref } from 'vue'
+import { ref, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
 import { api } from '../api/client'
 
@@ -52,6 +54,16 @@ const username = ref('')
 const password = ref('')
 const error = ref('')
 const loading = ref(false)
+const appVersion = ref('')
+
+onMounted(async () => {
+  try {
+    const info = await api.getVersion()
+    appVersion.value = info.version
+  } catch {
+    // Showing the version is optional; never block signing in.
+  }
+})
 
 async function handleLogin() {
   error.value = ''
@@ -72,6 +84,13 @@ async function handleLogin() {
 </script>
 
 <style scoped>
+.login-version {
+  margin-top: 1.25rem;
+  text-align: center;
+  font-size: 0.75rem;
+  color: var(--text-muted);
+}
+
 .login-page {
   min-height: 100vh;
   display: flex;

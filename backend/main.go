@@ -18,6 +18,7 @@ import (
 	"github.com/wzin/realmrunner/mods"
 	"github.com/wzin/realmrunner/scheduler"
 	"github.com/wzin/realmrunner/server"
+	"github.com/wzin/realmrunner/version"
 	"github.com/wzin/realmrunner/websocket"
 )
 
@@ -111,14 +112,10 @@ func main() {
 	api.RegisterRoutes(router, authMiddleware, manager, hub, cfg)
 
 	// Serve static files (frontend)
-	router.Static("/assets", "./dist/assets")
-	router.StaticFile("/", "./dist/index.html")
-	router.NoRoute(func(c *gin.Context) {
-		c.File("./dist/index.html")
-	})
+	api.RegisterStatic(router, "./dist")
 
 	// Start server
-	log.Println("RealmRunner starting on :8080")
+	log.Printf("RealmRunner %s starting on :8080", version.Version)
 	if err := router.Run(":8080"); err != nil {
 		log.Fatalf("Failed to start server: %v", err)
 	}
