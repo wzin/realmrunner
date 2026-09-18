@@ -251,13 +251,19 @@ func (h *Handlers) UpgradeServer(c *gin.Context) {
 		return
 	}
 
-	if err := h.manager.UpgradeServer(id, req.Version, req.Flavor); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+	result, err := h.manager.UpgradeServer(id, req.Version, req.Flavor)
+	if err != nil {
+		response := gin.H{"error": err.Error()}
+		if result != nil {
+			response["rolled_back"] = result.RolledBack
+			response["backup_id"] = result.BackupID
+		}
+		c.JSON(http.StatusBadRequest, response)
 		return
 	}
 
 	srv, _ := h.manager.GetServer(id)
-	c.JSON(http.StatusOK, h.makeServerResponse(srv))
+	c.JSON(http.StatusOK, gin.H{"server": h.makeServerResponse(srv), "upgrade": result})
 }
 
 func (h *Handlers) HandleWebSocket(c *gin.Context) {

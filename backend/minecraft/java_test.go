@@ -82,7 +82,9 @@ func TestJavaCommand(t *testing.T) {
 		{"exact match 21", 21, java21},
 		{"older requirement uses oldest compatible runtime", 17, java21},
 		{"java 8 requirement falls forward to 21", 8, java21},
-		{"newer than anything installed falls back to PATH", 99, "java"},
+		// Nothing installed is new enough: return the newest runtime there is.
+		// The caller checks ResolveJava's satisfied flag and refuses to start.
+		{"newer than anything installed uses the newest runtime", 99, java25},
 	}
 
 	for _, tt := range tests {
@@ -145,5 +147,44 @@ func TestJavaArgs(t *testing.T) {
 		if args[i] != want[i] {
 			t.Errorf("javaArgs()[%d] = %q, want %q", i, args[i], want[i])
 		}
+	}
+}
+
+func TestResolveJavaReportsUnsatisfiableRequirements(t *testing.T) {
+	root := t.TempDir()
+	java21 := fakeJavaHome(t, root, "21")
+
+	original := javaSearchDirs
+	javaSearchDirs = []string{root}
+	t.Cleanup(func() { javaSearchDirs = original })
+
+	path, major, satisfied := ResolveJava(21)
+	if path != java21 || major != 21 || !satisfied {
+		t.Errorf("ResolveJava(21) = %q, %d, %v; want %q, 21, true", path, major, satisfied, java21)
+	}
+
+	// Minecraft 26.x on a Java 21-only image: this is the failure that used to
+	// show up only as an instant, unexplained shutdown.
+	path, major, satisfied = ResolveJava(25)
+	if satisfied {
+		t.Error("ResolveJava(25) reported satisfied with only Java 21 installed")
+	}
+	if path != java21 || major != 21 {
+		t.Errorf("ResolveJava(25) = %q, %d; want the newest installed runtime %q, 21", path, major, java21)
+	}
+}
+
+func TestInstalledJavaMajors(t *testing.T) {
+	root := t.TempDir()
+	fakeJavaHome(t, root, "21")
+	fakeJavaHome(t, root, "25")
+
+	original := javaSearchDirs
+	javaSearchDirs = []string{root}
+	t.Cleanup(func() { javaSearchDirs = original })
+
+	majors := InstalledJavaMajors()
+	if len(majors) != 2 || majors[0] != 21 || majors[1] != 25 {
+		t.Errorf("InstalledJavaMajors() = %v, want [21 25]", majors)
 	}
 }

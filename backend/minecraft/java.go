@@ -69,27 +69,53 @@ func RequiredJavaMajor(version string) int {
 // version. It prefers an exact match, then the oldest installed runtime that is
 // new enough, and finally falls back to whatever "java" is on PATH.
 func JavaCommand(requiredMajor int) string {
+	path, _, _ := ResolveJava(requiredMajor)
+	return path
+}
+
+// ResolveJava reports which runtime satisfies a requirement. major is the Java
+// major version of the chosen runtime (0 when falling back to PATH, where the
+// version is unknown), and satisfied is false when every installed runtime is
+// too old - the case that makes a server exit instantly with
+// UnsupportedClassVersionError.
+func ResolveJava(requiredMajor int) (path string, major int, satisfied bool) {
 	if override := os.Getenv(fmt.Sprintf("REALMRUNNER_JAVA_%d", requiredMajor)); override != "" {
-		return override
+		return override, requiredMajor, true
 	}
 
 	installed := installedJavaRuntimes()
 	if path, ok := installed[requiredMajor]; ok {
-		return path
+		return path, requiredMajor, true
 	}
 
 	majors := make([]int, 0, len(installed))
-	for major := range installed {
-		majors = append(majors, major)
+	for m := range installed {
+		majors = append(majors, m)
 	}
 	sort.Ints(majors)
-	for _, major := range majors {
-		if major >= requiredMajor {
-			return installed[major]
+	for _, m := range majors {
+		if m >= requiredMajor {
+			return installed[m], m, true
 		}
 	}
 
-	return "java"
+	// Nothing installed is new enough. Fall back to PATH, but say so: with no
+	// runtimes discovered at all we cannot tell what "java" is.
+	if len(majors) == 0 {
+		return "java", 0, true
+	}
+	return installed[majors[len(majors)-1]], majors[len(majors)-1], false
+}
+
+// InstalledJavaMajors lists the Java major versions available to this process.
+func InstalledJavaMajors() []int {
+	installed := installedJavaRuntimes()
+	majors := make([]int, 0, len(installed))
+	for m := range installed {
+		majors = append(majors, m)
+	}
+	sort.Ints(majors)
+	return majors
 }
 
 // JavaCommandForVersion resolves the java binary for a Minecraft version.
