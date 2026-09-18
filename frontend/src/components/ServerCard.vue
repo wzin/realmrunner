@@ -43,6 +43,14 @@
       </div>
     </div>
 
+    <div v-if="server.status === 'sleeping'" class="alert alert-info">
+      Asleep - the address stays online and the realm starts when a player joins.
+    </div>
+
+    <div v-if="server.status === 'crashed' && server.last_error" class="alert alert-error">
+      <strong>Crashed.</strong> {{ server.last_error }}
+    </div>
+
     <div v-if="error" class="alert alert-error">
       {{ error }}
     </div>
@@ -54,7 +62,10 @@
         <button v-if="server.status === 'stopped' && server.ready" @click="handleStart" class="btn btn-success btn-sm" :disabled="loading">Start</button>
         <button v-else-if="server.status === 'stopped' && !server.ready && isStaleDownload" @click="handleStart" class="btn btn-warning btn-sm" :disabled="loading" title="Download may have failed">Retry Start</button>
         <button v-else-if="server.status === 'stopped' && !server.ready" class="btn btn-secondary btn-sm" disabled>Downloading...</button>
+        <button v-if="server.status === 'sleeping'" @click="handleWake" class="btn btn-success btn-sm" :disabled="loading">Wake</button>
+        <button v-if="server.status === 'crashed'" @click="handleStart" class="btn btn-warning btn-sm" :disabled="loading">Start Again</button>
         <button v-if="server.status === 'running'" @click="handleStop" class="btn btn-danger btn-sm" :disabled="loading">Stop</button>
+        <button v-if="server.status === 'running' && server.auto_sleep" @click="handleSleep" class="btn btn-secondary btn-sm" :disabled="loading" title="Stop now but keep the address online">Sleep Now</button>
         <button v-if="server.status === 'running' || server.status === 'stopping'" @click="handleForceStop" class="btn btn-danger btn-sm" :disabled="loading" title="Force kill the process immediately">Force Kill</button>
         <button v-if="server.status === 'starting' || server.status === 'stopping'" class="btn btn-secondary btn-sm" disabled>{{ server.status }}...</button>
       </div>
@@ -65,6 +76,7 @@
       <span class="section-label pixel-font">Monitor</span>
       <div class="action-buttons">
         <button v-if="server.status === 'running'" @click="$emit('console', server)" class="btn btn-primary btn-sm">Console</button>
+        <button v-if="server.status === 'running'" @click="$emit('online', server)" class="btn btn-secondary btn-sm">Who's Online</button>
         <button v-if="server.status === 'stopped'" @click="$emit('console', server)" class="btn btn-secondary btn-sm">View Logs</button>
         <button @click="$emit('metrics', server)" class="btn btn-secondary btn-sm">Metrics</button>
       </div>
@@ -77,8 +89,9 @@
         <button @click="$emit('files', server)" class="btn btn-secondary btn-sm">Config</button>
         <button @click="$emit('players', server)" class="btn btn-secondary btn-sm">Players</button>
         <button @click="$emit('schedule', server)" class="btn btn-secondary btn-sm">Schedule</button>
-        <button v-if="server.status === 'stopped'" @click="$emit('limits', server)" class="btn btn-secondary btn-sm">Limits</button>
-        <button v-if="server.status === 'stopped'" @click="$emit('upgrade', server)" class="btn btn-secondary btn-sm">Upgrade</button>
+        <button @click="$emit('sleep', server)" class="btn btn-secondary btn-sm">Sleep &amp; Recovery</button>
+        <button v-if="isIdle" @click="$emit('limits', server)" class="btn btn-secondary btn-sm">Limits</button>
+        <button v-if="isIdle" @click="$emit('upgrade', server)" class="btn btn-secondary btn-sm">Upgrade</button>
         <button v-if="server.flavor && server.flavor !== 'vanilla'" @click="$emit('mods', server)" class="btn btn-secondary btn-sm">Mods</button>
       </div>
     </div>
@@ -97,8 +110,8 @@
       <span class="section-label pixel-font">Data</span>
       <div class="action-buttons">
         <button @click="$emit('backups', server)" class="btn btn-secondary btn-sm">Backups</button>
-        <button v-if="server.status === 'stopped'" @click="handleReset" class="btn btn-warning btn-sm" :disabled="loading">Reset World</button>
-        <button v-if="server.status === 'stopped'" @click="handleDelete" class="btn btn-danger btn-sm" :disabled="loading">Delete Server</button>
+        <button v-if="isIdle" @click="handleReset" class="btn btn-warning btn-sm" :disabled="loading">Reset World</button>
+        <button v-if="isIdle" @click="handleDelete" class="btn btn-danger btn-sm" :disabled="loading">Delete Server</button>
       </div>
     </div>
   </div>
@@ -115,7 +128,7 @@ const props = defineProps({
   }
 })
 
-const emit = defineEmits(['refresh', 'console', 'metrics', 'upgrade', 'limits', 'files', 'players', 'backups', 'mods', 'schedule', 'share', 'viewers'])
+const emit = defineEmits(['refresh', 'console', 'metrics', 'upgrade', 'limits', 'files', 'players', 'online', 'backups', 'mods', 'schedule', 'sleep', 'share', 'viewers'])
 
 const loading = ref(false)
 const error = ref('')
@@ -125,6 +138,11 @@ let metricsWs = null
 const displayMetrics = computed(() => {
   return liveMetrics.value || props.server.metrics
 })
+
+// A realm that is not doing anything right now: safe to reconfigure or delete.
+const isIdle = computed(() =>
+  ['stopped', 'sleeping', 'crashed'].includes(props.server.status)
+)
 
 const isStaleDownload = computed(() => {
   if (props.server.ready) return false
@@ -185,6 +203,34 @@ async function handleStart() {
     emit('refresh')
   } catch (err) {
     error.value = err.message || 'Failed to start server'
+  } finally {
+    loading.value = false
+  }
+}
+
+async function handleWake() {
+  loading.value = true
+  error.value = ''
+
+  try {
+    await api.wakeServer(props.server.id)
+    emit('refresh')
+  } catch (err) {
+    error.value = err.message || 'Failed to wake server'
+  } finally {
+    loading.value = false
+  }
+}
+
+async function handleSleep() {
+  loading.value = true
+  error.value = ''
+
+  try {
+    await api.sleepServer(props.server.id)
+    emit('refresh')
+  } catch (err) {
+    error.value = err.message || 'Failed to put the server to sleep'
   } finally {
     loading.value = false
   }
@@ -303,6 +349,29 @@ function formatDate(dateString) {
   border-radius: 2px;
   font-size: 0.5rem;
   text-transform: uppercase;
+}
+
+.status-sleeping {
+  background: var(--status-stopped-bg);
+  color: var(--status-stopped-text);
+  border-color: var(--status-stopped-bg);
+  opacity: 0.85;
+}
+
+.status-crashed {
+  background: var(--status-error-bg, #7f1d1d);
+  color: var(--status-error-text, #fecaca);
+  border-color: var(--status-error-bg, #7f1d1d);
+}
+
+.alert-info {
+  background: var(--status-stopped-bg);
+  color: var(--status-stopped-text);
+  border: 1px solid var(--status-stopped-bg);
+  padding: 0.5rem 0.75rem;
+  border-radius: 4px;
+  font-size: 0.8125rem;
+  margin-bottom: 0.75rem;
 }
 
 .status-stopped {

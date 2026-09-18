@@ -51,6 +51,8 @@
           @limits="openLimits"
           @files="openFiles"
           @players="openPlayers"
+          @online="openOnline"
+          @sleep="openSleep"
           @backups="openBackups"
           @mods="openMods"
           @schedule="openSchedule"
@@ -96,6 +98,19 @@
       v-if="filesServer"
       :server="filesServer"
       @close="filesServer = null"
+    />
+
+    <OnlinePlayersModal
+      v-if="onlineServer"
+      :server="onlineServer"
+      @close="onlineServer = null"
+    />
+
+    <SleepModal
+      v-if="sleepServer"
+      :server="sleepServer"
+      @close="sleepServer = null"
+      @saved="sleepServer = null; loadServers()"
     />
 
     <WhitelistModal
@@ -166,6 +181,8 @@ import UpgradeModal from '../components/UpgradeModal.vue'
 import LimitsModal from '../components/LimitsModal.vue'
 import FileEditorModal from '../components/FileEditorModal.vue'
 import WhitelistModal from '../components/WhitelistModal.vue'
+import OnlinePlayersModal from '../components/OnlinePlayersModal.vue'
+import SleepModal from '../components/SleepModal.vue'
 import BackupsModal from '../components/BackupsModal.vue'
 import ModsModal from '../components/ModsModal.vue'
 import ScheduleModal from '../components/ScheduleModal.vue'
@@ -189,6 +206,8 @@ const upgradeServer = ref(null)
 const limitsServer = ref(null)
 const filesServer = ref(null)
 const playersServer = ref(null)
+const onlineServer = ref(null)
+const sleepServer = ref(null)
 const backupsServer = ref(null)
 const modsServer = ref(null)
 const scheduleServer = ref(null)
@@ -283,6 +302,14 @@ function openBackups(server) {
 
 function openPlayers(server) {
   playersServer.value = server
+}
+
+function openOnline(server) {
+  onlineServer.value = server
+}
+
+function openSleep(server) {
+  sleepServer.value = server
 }
 
 function openFiles(server) {

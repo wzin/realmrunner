@@ -3,17 +3,19 @@ package main
 import (
 	"log"
 	"os"
+	"os/signal"
+	"syscall"
 
 	"github.com/gin-contrib/cors"
 	"github.com/gin-gonic/gin"
 	"github.com/wzin/realmrunner/api"
 	"github.com/wzin/realmrunner/auth"
-	"github.com/wzin/realmrunner/config"
 	"github.com/wzin/realmrunner/backup"
 	"github.com/wzin/realmrunner/cgroup"
+	"github.com/wzin/realmrunner/config"
 	"github.com/wzin/realmrunner/metrics"
-	"github.com/wzin/realmrunner/mods"
 	"github.com/wzin/realmrunner/minecraft"
+	"github.com/wzin/realmrunner/mods"
 	"github.com/wzin/realmrunner/scheduler"
 	"github.com/wzin/realmrunner/server"
 	"github.com/wzin/realmrunner/websocket"
@@ -67,6 +69,20 @@ func main() {
 	// Initialize scheduler
 	sched := scheduler.NewScheduler(db, manager)
 	sched.Start()
+
+	// Hold the ports of servers configured to sleep, so a joining player can
+	// wake them, and start the idle watcher.
+	manager.StartSleepProxies()
+
+	// Release those ports on shutdown.
+	shutdown := make(chan os.Signal, 1)
+	signal.Notify(shutdown, syscall.SIGINT, syscall.SIGTERM)
+	go func() {
+		<-shutdown
+		log.Println("Shutting down...")
+		manager.Shutdown()
+		os.Exit(0)
+	}()
 
 	// Set up Gin router
 	if os.Getenv("GIN_MODE") != "debug" {
