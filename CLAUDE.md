@@ -141,6 +141,7 @@ This document provides context for AI assistants (like Claude) working on the Re
 ## API Endpoints
 
 ### Authentication
+- `GET /api/version` - Running build (no auth)
 - `POST /api/auth/login` - Returns JWT token
   - Body: `{password: string}`
   - Response: `{token: string}`
@@ -484,6 +485,28 @@ Multi-stage Dockerfile:
    - Expose port 8080
    - Set CMD to backend binary
 
+## Static Assets and Caching
+
+The frontend build gives each asset a content hash, so `/assets/*` is served
+`public, max-age=31536000, immutable`, while `index.html` - which names those
+assets - is served `no-cache, no-store, must-revalidate`.
+
+Getting this wrong is a deployment trap: with no `Cache-Control` a browser
+applies heuristic caching to `index.html`, and after the next deployment that
+visitor asks for asset files the new image does not contain. The bundle 404s and
+they get a blank page until they clear their cache.
+
+Unknown `/api/*` paths return a JSON 404 rather than the app shell, so an API
+caller sees the error instead of HTML with a 200.
+
+## Build Identity
+
+`version.Version` and `version.Commit` are set by the Docker build through
+`-ldflags` (`VERSION` and `COMMIT` build args, which CI fills from the git tag
+and SHA); a local build reports `dev`. `GET /api/version` needs no
+authentication, and both the dashboard header and the login page show it, so a
+deployment can be confirmed at a glance.
+
 ## Deployment
 
 RealmRunner is deployed via **Komodo** which manages the stack from this git repo.
@@ -498,7 +521,29 @@ The `compose.yaml` includes:
 
 Environment variables (`REALMRUNNER_PASSWORD_HASH`, `REALMRUNNER_JWT_SECRET`) are set in Komodo's stack configuration. Use unescaped bcrypt hashes in Komodo's UI.
 
-### Deployment Checklist
+### Static Assets and Caching
+
+The frontend build gives each asset a content hash, so `/assets/*` is served
+`public, max-age=31536000, immutable`, while `index.html` - which names those
+assets - is served `no-cache, no-store, must-revalidate`.
+
+Getting this wrong is a deployment trap: with no `Cache-Control` a browser
+applies heuristic caching to `index.html`, and after the next deployment that
+visitor asks for asset files the new image does not contain. The bundle 404s and
+they get a blank page until they clear their cache.
+
+Unknown `/api/*` paths return a JSON 404 rather than the app shell, so an API
+caller sees the error instead of HTML with a 200.
+
+## Build Identity
+
+`version.Version` and `version.Commit` are set by the Docker build through
+`-ldflags` (`VERSION` and `COMMIT` build args, which CI fills from the git tag
+and SHA); a local build reports `dev`. `GET /api/version` needs no
+authentication, and both the dashboard header and the login page show it, so a
+deployment can be confirmed at a glance.
+
+## Deployment Checklist
 
 - [ ] Set strong REALMRUNNER_PASSWORD_HASH in Komodo
 - [ ] Set REALMRUNNER_JWT_SECRET in Komodo
@@ -566,6 +611,10 @@ Environment variables (`REALMRUNNER_PASSWORD_HASH`, `REALMRUNNER_JWT_SECRET`) ar
 - **v2.1.0**: RCON control channel with live player management, auto-sleep with wake-on-join,
   crash recovery with backoff restarts, backed-up and reversible upgrades, metrics history fix
   for the 24h/7d/30d ranges (2026-09-18)
+- **v2.2.0**: Heap pressure measured from the GC log rather than inferred from resident memory,
+  with container headroom enforcement (2026-09-18)
+- **v2.3.0**: Correct cache headers for the app shell and hashed assets, fixing blank pages after a
+  deployment; version shown in the dashboard and on the login page (2026-09-18)
 
 ---
 

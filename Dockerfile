@@ -18,7 +18,13 @@ COPY backend/go.mod ./
 
 COPY backend/ ./
 RUN go mod download && go mod tidy
-RUN CGO_ENABLED=1 GOOS=linux go build -o realmrunner .
+
+# Stamped by CI from the git tag; a plain build reports "dev".
+ARG VERSION=dev
+ARG COMMIT=""
+RUN CGO_ENABLED=1 GOOS=linux go build \
+    -ldflags "-X github.com/wzin/realmrunner/version.Version=${VERSION} -X github.com/wzin/realmrunner/version.Commit=${COMMIT}" \
+    -o realmrunner .
 
 # Stage 3: Runtime
 #
