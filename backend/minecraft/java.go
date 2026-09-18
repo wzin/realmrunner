@@ -164,11 +164,48 @@ func majorFromDirName(name string) (int, bool) {
 	return major, true
 }
 
-// javaArgs builds the common JVM arguments used by every flavor.
+// javaArgs builds the JVM arguments used by every flavor: the heap size plus
+// the G1 tuning Minecraft server operators have converged on (Aikar's flags).
+//
+// The defaults give long stop-the-world pauses on a server with players on it,
+// which show up as "Can't keep up!" in the log and as timeouts for players,
+// because the server misses their keep-alives while it is paused.
 func javaArgs(memoryMB int) []string {
-	return []string{
+	args := []string{
 		fmt.Sprintf("-Xmx%dM", memoryMB),
 		fmt.Sprintf("-Xms%dM", memoryMB),
-		"-jar", "server.jar", "nogui",
+	}
+	args = append(args, GCFlags(memoryMB)...)
+	return append(args, "-jar", "server.jar", "nogui")
+}
+
+// GCFlags returns G1 settings tuned for a Minecraft server of the given heap
+// size. The two values that change with heap size are the new-generation sizes
+// and the region size, following Aikar's published flags.
+func GCFlags(memoryMB int) []string {
+	newSizePercent, maxNewSizePercent, heapRegionSize, reservePercent := "30", "40", "8M", "20"
+	if memoryMB >= 12*1024 {
+		newSizePercent, maxNewSizePercent, heapRegionSize, reservePercent = "40", "50", "16M", "15"
+	}
+
+	return []string{
+		"-XX:+UseG1GC",
+		"-XX:+ParallelRefProcEnabled",
+		"-XX:MaxGCPauseMillis=200",
+		"-XX:+UnlockExperimentalVMOptions",
+		"-XX:+DisableExplicitGC",
+		"-XX:+AlwaysPreTouch",
+		"-XX:G1NewSizePercent=" + newSizePercent,
+		"-XX:G1MaxNewSizePercent=" + maxNewSizePercent,
+		"-XX:G1HeapRegionSize=" + heapRegionSize,
+		"-XX:G1ReservePercent=" + reservePercent,
+		"-XX:G1HeapWastePercent=5",
+		"-XX:G1MixedGCCountTarget=4",
+		"-XX:InitiatingHeapOccupancyPercent=15",
+		"-XX:G1MixedGCLiveThresholdPercent=90",
+		"-XX:G1RSetUpdatingPauseTimePercent=5",
+		"-XX:SurvivorRatio=32",
+		"-XX:+PerfDisableSharedMem",
+		"-XX:MaxTenuringThreshold=1",
 	}
 }

@@ -14,6 +14,8 @@ A web-based Minecraft Java Edition server manager packaged as a Docker container
 - **Live Player Control**: see who is online and kick, ban, op or deop them over RCON
 - **Crash Recovery**: a crashed realm explains why and restarts itself with a growing delay
 - **Safe Upgrades**: every version change takes a backup first and rolls back if it fails to start
+- **Connection Health**: see who dropped, why, and whether the server was stalling at the time
+- **Per-Realm Memory**: set each realm's Java heap; every server runs with tuned G1 flags
 - **Server Controls**: Start, stop, and wipeout servers with one click
 - **Real-time Logs**: View server logs as they happen
 - **Console Access**: Send commands directly to running servers

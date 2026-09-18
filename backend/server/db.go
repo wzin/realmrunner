@@ -37,6 +37,9 @@ type Server struct {
 	IdleTimeoutMin int  `json:"idle_timeout_min"`
 	InternalPort   int  `json:"internal_port"`
 
+	// HeapMB is the Java heap for this server; 0 means the global default.
+	HeapMB int `json:"heap_mb"`
+
 	// Crash handling.
 	AutoRestart  bool   `json:"auto_restart"`
 	LastExitCode int    `json:"last_exit_code"`
@@ -99,6 +102,7 @@ func InitDB(dataDir string) (*sql.DB, error) {
 	db.Exec("ALTER TABLE servers ADD COLUMN auto_restart INTEGER DEFAULT 1")
 	db.Exec("ALTER TABLE servers ADD COLUMN last_exit_code INTEGER DEFAULT 0")
 	db.Exec("ALTER TABLE servers ADD COLUMN last_error TEXT DEFAULT ''")
+	db.Exec("ALTER TABLE servers ADD COLUMN heap_mb INTEGER DEFAULT 0")
 
 	return db, nil
 }
@@ -116,7 +120,7 @@ func CreateServer(db *sql.DB, server *Server) error {
 }
 
 func GetServer(db *sql.DB, id string) (*Server, error) {
-	query := `SELECT id, name, version, flavor, port, status, cpu_limit, memory_limit_mb, restart_schedule, ready, share_token, created_at, last_started_at, rcon_port, rcon_password, auto_sleep, idle_timeout_min, internal_port, auto_restart, last_exit_code, last_error FROM servers WHERE id = ?`
+	query := `SELECT id, name, version, flavor, port, status, cpu_limit, memory_limit_mb, restart_schedule, ready, share_token, created_at, last_started_at, rcon_port, rcon_password, auto_sleep, idle_timeout_min, internal_port, auto_restart, last_exit_code, last_error, heap_mb FROM servers WHERE id = ?`
 	server := &Server{}
 	err := db.QueryRow(query, id).Scan(
 		&server.ID,
@@ -140,6 +144,7 @@ func GetServer(db *sql.DB, id string) (*Server, error) {
 		&server.AutoRestart,
 		&server.LastExitCode,
 		&server.LastError,
+		&server.HeapMB,
 	)
 	if err == sql.ErrNoRows {
 		return nil, fmt.Errorf("server not found")
@@ -148,7 +153,7 @@ func GetServer(db *sql.DB, id string) (*Server, error) {
 }
 
 func GetAllServers(db *sql.DB) ([]*Server, error) {
-	query := `SELECT id, name, version, flavor, port, status, cpu_limit, memory_limit_mb, restart_schedule, ready, share_token, created_at, last_started_at, rcon_port, rcon_password, auto_sleep, idle_timeout_min, internal_port, auto_restart, last_exit_code, last_error FROM servers ORDER BY created_at DESC`
+	query := `SELECT id, name, version, flavor, port, status, cpu_limit, memory_limit_mb, restart_schedule, ready, share_token, created_at, last_started_at, rcon_port, rcon_password, auto_sleep, idle_timeout_min, internal_port, auto_restart, last_exit_code, last_error, heap_mb FROM servers ORDER BY created_at DESC`
 	rows, err := db.Query(query)
 	if err != nil {
 		return nil, err
@@ -180,6 +185,7 @@ func GetAllServers(db *sql.DB) ([]*Server, error) {
 			&server.AutoRestart,
 			&server.LastExitCode,
 			&server.LastError,
+			&server.HeapMB,
 		)
 		if err != nil {
 			return nil, err
@@ -319,4 +325,10 @@ func InternalPortExists(db *sql.DB, port int) (bool, error) {
 	var count int
 	err := db.QueryRow("SELECT COUNT(*) FROM servers WHERE internal_port = ? OR port = ? OR rcon_port = ?", port, port, port).Scan(&count)
 	return count > 0, err
+}
+
+// SetHeapMB sets the Java heap for one server; 0 restores the global default.
+func SetHeapMB(db *sql.DB, id string, heapMB int) error {
+	_, err := db.Exec("UPDATE servers SET heap_mb = ? WHERE id = ?", heapMB, id)
+	return err
 }

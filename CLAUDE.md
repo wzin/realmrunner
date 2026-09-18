@@ -76,6 +76,7 @@ This document provides context for AI assistants (like Claude) working on the Re
 │   │   ├── control.go          # RCON provisioning and commands
 │   │   ├── crash.go            # Crash detection, backoff restarts, preflight
 │   │   ├── sleep.go            # Auto-sleep proxies and idle watcher
+│   │   ├── diagnostics.go      # Disconnect/lag analysis from server logs
 │   │   ├── upgrade.go          # Backed-up, verified, reversible upgrades
 │   │   ├── properties.go       # server.properties editing
 │   │   └── db.go               # SQLite operations
@@ -161,6 +162,9 @@ This document provides context for AI assistants (like Claude) working on the Re
   - Body: `{enabled: bool}`
 
 ### Players (RCON)
+- `GET /api/servers/:id/diagnostics` - Connection health read from the log
+- `PUT /api/servers/:id/heap` - Set the Java heap
+  - Body: `{heap_mb: number}`
 - `GET /api/servers/:id/players` - Who is online
 - `POST /api/servers/:id/players/kick` - Body: `{player: string, reason?: string}`
 - `POST /api/servers/:id/players/ban` - Body: `{player: string, reason?: string}`
@@ -193,6 +197,7 @@ CREATE TABLE servers (
     auto_restart INTEGER,             -- restart after a crash
     last_exit_code INTEGER,           -- how the process last ended
     last_error TEXT,                  -- why it crashed, shown in the UI
+    heap_mb INTEGER,                  -- per-server Java heap; 0 uses the default
     created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
     last_started_at TIMESTAMP
 );
@@ -211,6 +216,16 @@ REALMRUNNER_BASE_URL=realmrunner.ziniewicz.eu  # Display domain
 ```
 
 ## Key Algorithms & Logic
+
+### JVM Heap and GC Flags
+
+Each server may set its own heap (`heap_mb`, falling back to
+`REALMRUNNER_MEMORY_MB`), and every server starts with G1 tuned the way
+Minecraft operators have converged on (Aikar's flags), with the new-generation
+sizes and region size scaling at a 12 GB heap. Default GC settings give
+multi-second stop-the-world pauses on a populated server, which appear as
+"Can't keep up!" in the log and as players timing out, because the server misses
+keep-alives while it is paused.
 
 ### Java Runtime Selection
 
@@ -314,8 +329,36 @@ APIs; CI runs it weekly so a sunset endpoint surfaces before users hit it.
 3. If still running, send SIGKILL
 4. Update status to "stopped"
 
+### Log Capture
+
+The Minecraft server writes `logs/latest.log` itself through log4j, so
+RealmRunner captures the process output to `logs/console.log` instead. Two
+writers appending to one file interleave half-lines and make the log unusable.
+
+`console.log` is a superset (it also holds JVM-level output such as
+`UnsupportedClassVersionError`), so readers prefer it and fall back to
+`latest.log` for servers created before this. The previous run is kept as
+`console.log.1`, and stdout and stderr are read concurrently - reading them in
+sequence held back every stack trace until the process exited.
+
+### Connection Diagnostics
+
+`AnalyseLogs` summarises a server's log into disconnect reasons with plain-word
+explanations, per-player drop counts with addresses, lag warnings with the worst
+stall, and restart counts. It exists because "connection lost" has several
+distinct causes that look alike in a raw log:
+
+| Log reason | What it means |
+|---|---|
+| `Disconnected` | The connection dropped with no goodbye: a network path problem, not a server decision |
+| `Timed out` | No keep-alive answer for 30s: a broken path, or the server stalled long enough to miss them |
+| `You logged in from another location` | The account reconnected while the server still held a dead session |
+
+Several players sharing one address is called out explicitly, because drops
+affecting only that address point at that link rather than the server.
+
 ### Log Tailing
-1. Open logs/latest.log in read mode
+1. Open logs/console.log in read mode
 2. Seek to end of file
 3. Use `inotify` or polling to detect new lines
 4. Send new lines to WebSocket clients
@@ -377,11 +420,10 @@ APIs; CI runs it weekly so a sunset endpoint surfaces before users hit it.
 
 ## Known Limitations
 
-1. **No per-server memory config**: All servers get same allocation
-2. **Roles, not per-realm permissions**: owner/admin/operator/viewer
-3. **Wipeout is permanent**: backups exist, but wipeout does not take one
-4. **Basic port conflict handling**: No auto-reassignment
-5. **Auto-sleep needs a restart to toggle**: the server changes port
+1. **Roles, not per-realm permissions**: owner/admin/operator/viewer
+2. **Wipeout is permanent**: backups exist, but wipeout does not take one
+3. **Basic port conflict handling**: No auto-reassignment
+4. **Auto-sleep needs a restart to toggle**: the server changes port
 
 ## Security Considerations
 

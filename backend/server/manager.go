@@ -204,17 +204,17 @@ func (m *Manager) StartServer(id string) error {
 	}
 
 	serverDir := m.getServerDir(id)
+	heapMB := m.heapFor(server)
 	// Minecraft versions require different Java runtimes (26.x needs Java 25),
 	// so resolve the interpreter from the server's version.
 	cmd := minecraft.JavaCommandForVersion(server.Version)
-	args := []string{
-		fmt.Sprintf("-Xmx%dM", m.config.MemoryMB),
-		fmt.Sprintf("-Xms%dM", m.config.MemoryMB),
-		"-jar", "server.jar", "nogui",
-	}
+	args := append([]string{
+		fmt.Sprintf("-Xmx%dM", heapMB),
+		fmt.Sprintf("-Xms%dM", heapMB),
+	}, "-jar", "server.jar", "nogui")
 	if m.registry != nil {
 		if provider, ok := m.registry.GetProvider(server.Flavor); ok {
-			cmd, args = provider.StartCommand(serverDir, m.config.MemoryMB, server.Version)
+			cmd, args = provider.StartCommand(serverDir, heapMB, server.Version)
 		}
 	}
 	log.Printf("Starting server %s (%s %s) with %s", id, server.Flavor, server.Version, cmd)
@@ -483,6 +483,33 @@ func (m *Manager) SetLimits(id string, cpuLimit float64, memoryLimitMB int) erro
 		return fmt.Errorf("server must be stopped to change limits")
 	}
 	return UpdateServerLimits(m.db, id, cpuLimit, memoryLimitMB)
+}
+
+// heapFor is the Java heap a server should run with: its own setting, or the
+// instance-wide default when it has none.
+func (m *Manager) heapFor(srv *Server) int {
+	if srv.HeapMB > 0 {
+		return srv.HeapMB
+	}
+	return m.config.MemoryMB
+}
+
+// SetHeapMB changes one server's Java heap. It takes effect on the next start.
+func (m *Manager) SetHeapMB(id string, heapMB int) error {
+	srv, err := GetServer(m.db, id)
+	if err != nil {
+		return err
+	}
+	if heapMB < 0 {
+		return fmt.Errorf("heap size cannot be negative")
+	}
+	if heapMB > 0 && heapMB < 512 {
+		return fmt.Errorf("a Minecraft server needs at least 512 MB of heap")
+	}
+	if srv.MemoryLimitMB > 0 && heapMB > srv.MemoryLimitMB {
+		return fmt.Errorf("the heap (%d MB) cannot be larger than the server's memory limit (%d MB)", heapMB, srv.MemoryLimitMB)
+	}
+	return SetHeapMB(m.db, id, heapMB)
 }
 
 func (m *Manager) SetRestartSchedule(id, schedule string) error {

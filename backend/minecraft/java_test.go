@@ -3,6 +3,7 @@ package minecraft
 import (
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 )
 
@@ -139,13 +140,40 @@ func TestJavaCommandNoInstallations(t *testing.T) {
 
 func TestJavaArgs(t *testing.T) {
 	args := javaArgs(2048)
-	want := []string{"-Xmx2048M", "-Xms2048M", "-jar", "server.jar", "nogui"}
-	if len(args) != len(want) {
-		t.Fatalf("javaArgs returned %v, want %v", args, want)
+
+	if args[0] != "-Xmx2048M" || args[1] != "-Xms2048M" {
+		t.Errorf("heap arguments = %v", args[:2])
 	}
-	for i := range want {
-		if args[i] != want[i] {
-			t.Errorf("javaArgs()[%d] = %q, want %q", i, args[i], want[i])
+	// The jar must stay last, after the tuning flags.
+	tail := args[len(args)-3:]
+	if tail[0] != "-jar" || tail[1] != "server.jar" || tail[2] != "nogui" {
+		t.Errorf("arguments end with %v, want -jar server.jar nogui", tail)
+	}
+
+	joined := strings.Join(args, " ")
+	for _, flag := range []string{"-XX:+UseG1GC", "-XX:MaxGCPauseMillis=200", "-XX:+AlwaysPreTouch"} {
+		if !strings.Contains(joined, flag) {
+			t.Errorf("tuning flag %s is missing from %v", flag, args)
+		}
+	}
+}
+
+// The new-generation sizing differs for large heaps.
+func TestGCFlagsScaleWithHeap(t *testing.T) {
+	small := strings.Join(GCFlags(2048), " ")
+	large := strings.Join(GCFlags(16*1024), " ")
+
+	if !strings.Contains(small, "-XX:G1NewSizePercent=30") || !strings.Contains(small, "-XX:G1HeapRegionSize=8M") {
+		t.Errorf("small-heap flags = %s", small)
+	}
+	if !strings.Contains(large, "-XX:G1NewSizePercent=40") || !strings.Contains(large, "-XX:G1HeapRegionSize=16M") {
+		t.Errorf("large-heap flags = %s", large)
+	}
+
+	// Both must pin the pause target, which is the point of the exercise.
+	for _, flags := range []string{small, large} {
+		if !strings.Contains(flags, "-XX:MaxGCPauseMillis=200") {
+			t.Errorf("pause target missing from %s", flags)
 		}
 	}
 }
