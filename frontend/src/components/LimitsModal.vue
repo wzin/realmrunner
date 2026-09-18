@@ -8,6 +8,16 @@
         <div v-if="error" class="alert alert-error">{{ error }}</div>
 
         <div class="form-group">
+          <label class="form-label">Java Heap (MB)</label>
+          <input v-model.number="form.heapMB" type="number" class="input" min="0" step="512" placeholder="0 = use default" :disabled="loading" />
+          <p class="help-text">
+            How much memory the Minecraft server itself may use (-Xmx). Too little causes long
+            garbage-collection pauses, which show up as lag and as players timing out. Set to 0 to
+            use the instance default.
+          </p>
+        </div>
+
+        <div class="form-group">
           <label class="form-label">CPU Limit (cores)</label>
           <input v-model.number="form.cpuLimit" type="number" class="input" step="0.1" min="0" placeholder="0 = unlimited" :disabled="loading" />
           <p class="help-text">Number of CPU cores (e.g., 1.5). Set to 0 for unlimited.</p>
@@ -38,6 +48,7 @@ const props = defineProps({ server: { type: Object, required: true } })
 const emit = defineEmits(['close', 'saved'])
 
 const form = ref({
+  heapMB: props.server.heap_mb || 0,
   cpuLimit: props.server.cpu_limit || 0,
   memoryLimitMB: props.server.memory_limit_mb || 0,
 })
@@ -49,6 +60,7 @@ async function handleSave() {
   error.value = ''
   try {
     await api.setLimits(props.server.id, form.value.cpuLimit, form.value.memoryLimitMB)
+    await api.setHeap(props.server.id, form.value.heapMB)
     emit('saved')
   } catch (err) {
     error.value = err.message || 'Failed to save limits'

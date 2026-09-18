@@ -69,27 +69,53 @@ func RequiredJavaMajor(version string) int {
 // version. It prefers an exact match, then the oldest installed runtime that is
 // new enough, and finally falls back to whatever "java" is on PATH.
 func JavaCommand(requiredMajor int) string {
+	path, _, _ := ResolveJava(requiredMajor)
+	return path
+}
+
+// ResolveJava reports which runtime satisfies a requirement. major is the Java
+// major version of the chosen runtime (0 when falling back to PATH, where the
+// version is unknown), and satisfied is false when every installed runtime is
+// too old - the case that makes a server exit instantly with
+// UnsupportedClassVersionError.
+func ResolveJava(requiredMajor int) (path string, major int, satisfied bool) {
 	if override := os.Getenv(fmt.Sprintf("REALMRUNNER_JAVA_%d", requiredMajor)); override != "" {
-		return override
+		return override, requiredMajor, true
 	}
 
 	installed := installedJavaRuntimes()
 	if path, ok := installed[requiredMajor]; ok {
-		return path
+		return path, requiredMajor, true
 	}
 
 	majors := make([]int, 0, len(installed))
-	for major := range installed {
-		majors = append(majors, major)
+	for m := range installed {
+		majors = append(majors, m)
 	}
 	sort.Ints(majors)
-	for _, major := range majors {
-		if major >= requiredMajor {
-			return installed[major]
+	for _, m := range majors {
+		if m >= requiredMajor {
+			return installed[m], m, true
 		}
 	}
 
-	return "java"
+	// Nothing installed is new enough. Fall back to PATH, but say so: with no
+	// runtimes discovered at all we cannot tell what "java" is.
+	if len(majors) == 0 {
+		return "java", 0, true
+	}
+	return installed[majors[len(majors)-1]], majors[len(majors)-1], false
+}
+
+// InstalledJavaMajors lists the Java major versions available to this process.
+func InstalledJavaMajors() []int {
+	installed := installedJavaRuntimes()
+	majors := make([]int, 0, len(installed))
+	for m := range installed {
+		majors = append(majors, m)
+	}
+	sort.Ints(majors)
+	return majors
 }
 
 // JavaCommandForVersion resolves the java binary for a Minecraft version.
@@ -138,11 +164,48 @@ func majorFromDirName(name string) (int, bool) {
 	return major, true
 }
 
-// javaArgs builds the common JVM arguments used by every flavor.
+// javaArgs builds the JVM arguments used by every flavor: the heap size plus
+// the G1 tuning Minecraft server operators have converged on (Aikar's flags).
+//
+// The defaults give long stop-the-world pauses on a server with players on it,
+// which show up as "Can't keep up!" in the log and as timeouts for players,
+// because the server misses their keep-alives while it is paused.
 func javaArgs(memoryMB int) []string {
-	return []string{
+	args := []string{
 		fmt.Sprintf("-Xmx%dM", memoryMB),
 		fmt.Sprintf("-Xms%dM", memoryMB),
-		"-jar", "server.jar", "nogui",
+	}
+	args = append(args, GCFlags(memoryMB)...)
+	return append(args, "-jar", "server.jar", "nogui")
+}
+
+// GCFlags returns G1 settings tuned for a Minecraft server of the given heap
+// size. The two values that change with heap size are the new-generation sizes
+// and the region size, following Aikar's published flags.
+func GCFlags(memoryMB int) []string {
+	newSizePercent, maxNewSizePercent, heapRegionSize, reservePercent := "30", "40", "8M", "20"
+	if memoryMB >= 12*1024 {
+		newSizePercent, maxNewSizePercent, heapRegionSize, reservePercent = "40", "50", "16M", "15"
+	}
+
+	return []string{
+		"-XX:+UseG1GC",
+		"-XX:+ParallelRefProcEnabled",
+		"-XX:MaxGCPauseMillis=200",
+		"-XX:+UnlockExperimentalVMOptions",
+		"-XX:+DisableExplicitGC",
+		"-XX:+AlwaysPreTouch",
+		"-XX:G1NewSizePercent=" + newSizePercent,
+		"-XX:G1MaxNewSizePercent=" + maxNewSizePercent,
+		"-XX:G1HeapRegionSize=" + heapRegionSize,
+		"-XX:G1ReservePercent=" + reservePercent,
+		"-XX:G1HeapWastePercent=5",
+		"-XX:G1MixedGCCountTarget=4",
+		"-XX:InitiatingHeapOccupancyPercent=15",
+		"-XX:G1MixedGCLiveThresholdPercent=90",
+		"-XX:G1RSetUpdatingPauseTimePercent=5",
+		"-XX:SurvivorRatio=32",
+		"-XX:+PerfDisableSharedMem",
+		"-XX:MaxTenuringThreshold=1",
 	}
 }

@@ -65,37 +65,34 @@ func GetLatestMetric(db *sql.DB, serverID string) (*Metric, error) {
 
 func GetMetricsHistory(db *sql.DB, serverID string, rangeStr string) ([]MetricPoint, error) {
 	var since time.Time
-	var bucket string
+	// groupBy buckets samples so a long window stays a readable number of
+	// points; an empty value means raw samples.
+	var groupBy string
 
 	now := time.Now()
 	switch rangeStr {
 	case "1h":
 		since = now.Add(-1 * time.Hour)
-		bucket = "" // raw data
+		groupBy = ""
 	case "24h":
 		since = now.Add(-24 * time.Hour)
-		bucket = "%Y-%m-%d %H:%M" // truncate to 5-min by grouping
+		groupBy = fiveMinuteBucket
 	case "7d":
 		since = now.Add(-7 * 24 * time.Hour)
-		bucket = "%Y-%m-%d %H" // hourly
+		groupBy = hourBucket
 	case "30d":
 		since = now.Add(-30 * 24 * time.Hour)
-		bucket = "%Y-%m-%d %H" // hourly (2h would need custom logic)
+		groupBy = fourHourBucket
 	default:
 		since = now.Add(-24 * time.Hour)
-		bucket = "%Y-%m-%d %H:%M"
+		groupBy = fiveMinuteBucket
 	}
 
-	var query string
-	if bucket == "" {
-		query = `SELECT timestamp, cpu_percent, memory_mb, player_count FROM metrics WHERE server_id = ? AND timestamp > ? ORDER BY timestamp`
-	} else {
-		// For 5-min bucketing on 24h: group by truncated minute / 5
-		if rangeStr == "24h" {
-			query = fmt.Sprintf(`SELECT MAX(timestamp), AVG(cpu_percent), AVG(memory_mb), MAX(player_count) FROM metrics WHERE server_id = ? AND timestamp > ? GROUP BY strftime('%s', timestamp), CAST(strftime('%%M', timestamp) AS INTEGER) / 5 ORDER BY MAX(timestamp)`, bucket)
-		} else {
-			query = fmt.Sprintf(`SELECT MAX(timestamp), AVG(cpu_percent), AVG(memory_mb), MAX(player_count) FROM metrics WHERE server_id = ? AND timestamp > ? GROUP BY strftime('%s', timestamp) ORDER BY MAX(timestamp)`, bucket)
-		}
+	query := `SELECT timestamp, cpu_percent, memory_mb, player_count FROM metrics WHERE server_id = ? AND timestamp > ? ORDER BY timestamp`
+	if groupBy != "" {
+		query = fmt.Sprintf(`SELECT MAX(timestamp), AVG(cpu_percent), AVG(memory_mb), MAX(player_count)
+			FROM metrics WHERE server_id = ? AND timestamp > ?
+			GROUP BY %s ORDER BY MAX(timestamp)`, groupBy)
 	}
 
 	rows, err := db.Query(query, serverID, since)
@@ -107,12 +104,64 @@ func GetMetricsHistory(db *sql.DB, serverID string, rangeStr string) ([]MetricPo
 	var points []MetricPoint
 	for rows.Next() {
 		var p MetricPoint
-		if err := rows.Scan(&p.Timestamp, &p.CPUPercent, &p.MemoryMB, &p.PlayerCount); err != nil {
+		// An aggregate such as MAX(timestamp) has no declared column type, so
+		// the driver hands it back as a string rather than converting it to a
+		// time.Time the way it does for the raw DATETIME column.
+		var rawTimestamp interface{}
+		if err := rows.Scan(&rawTimestamp, &p.CPUPercent, &p.MemoryMB, &p.PlayerCount); err != nil {
+			return nil, err
+		}
+		p.Timestamp, err = parseTimestamp(rawTimestamp)
+		if err != nil {
 			return nil, err
 		}
 		points = append(points, p)
 	}
-	return points, nil
+
+	return points, rows.Err()
+}
+
+// SQLite bucket expressions. Grouping by the hour plus a division of the minute
+// keeps each bucket the intended width.
+const (
+	fiveMinuteBucket = `strftime('%Y-%m-%d %H', timestamp), CAST(strftime('%M', timestamp) AS INTEGER) / 5`
+	hourBucket       = `strftime('%Y-%m-%d %H', timestamp)`
+	fourHourBucket   = `strftime('%Y-%m-%d', timestamp), CAST(strftime('%H', timestamp) AS INTEGER) / 4`
+)
+
+// timestampLayouts covers what the sqlite driver writes for a time.Time as well
+// as the formats a hand-written row might use.
+var timestampLayouts = []string{
+	"2006-01-02 15:04:05.999999999-07:00",
+	"2006-01-02 15:04:05.999999999Z07:00",
+	"2006-01-02 15:04:05-07:00",
+	"2006-01-02T15:04:05.999999999Z07:00",
+	"2006-01-02 15:04:05.999999999",
+	"2006-01-02 15:04:05",
+}
+
+func parseTimestamp(value interface{}) (time.Time, error) {
+	switch v := value.(type) {
+	case time.Time:
+		return v, nil
+	case []byte:
+		return parseTimestampString(string(v))
+	case string:
+		return parseTimestampString(v)
+	case nil:
+		return time.Time{}, fmt.Errorf("metrics: missing timestamp")
+	default:
+		return time.Time{}, fmt.Errorf("metrics: unsupported timestamp type %T", value)
+	}
+}
+
+func parseTimestampString(value string) (time.Time, error) {
+	for _, layout := range timestampLayouts {
+		if ts, err := time.Parse(layout, value); err == nil {
+			return ts, nil
+		}
+	}
+	return time.Time{}, fmt.Errorf("metrics: cannot parse timestamp %q", value)
 }
 
 func PurgeOldMetrics(db *sql.DB, olderThan time.Time) (int64, error) {

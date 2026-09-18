@@ -19,6 +19,10 @@ type Process struct {
 	stdout io.ReadCloser
 	stderr io.ReadCloser
 	mu     sync.Mutex
+
+	// stopRequested distinguishes an operator-initiated shutdown from a crash.
+	stopRequested bool
+	startedAt     time.Time
 }
 
 func StartProcess(serverDir string, port int, command string, args []string) (*Process, error) {
@@ -70,10 +74,11 @@ func StartProcess(serverDir string, port int, command string, args []string) (*P
 	}
 
 	process := &Process{
-		cmd:    cmd,
-		stdin:  stdin,
-		stdout: stdout,
-		stderr: stderr,
+		cmd:       cmd,
+		stdin:     stdin,
+		stdout:    stdout,
+		stderr:    stderr,
+		startedAt: time.Now(),
 	}
 
 	// Start log capture to file
@@ -85,6 +90,8 @@ func StartProcess(serverDir string, port int, command string, args []string) (*P
 func (p *Process) Stop() error {
 	p.mu.Lock()
 	defer p.mu.Unlock()
+
+	p.stopRequested = true
 
 	if p.cmd == nil || p.cmd.Process == nil {
 		return nil // Already stopped
@@ -115,6 +122,8 @@ func (p *Process) Stop() error {
 func (p *Process) ForceKill() {
 	p.mu.Lock()
 	defer p.mu.Unlock()
+
+	p.stopRequested = true
 	if p.cmd != nil && p.cmd.Process != nil {
 		p.cmd.Process.Signal(syscall.SIGKILL)
 	}
@@ -132,31 +141,79 @@ func (p *Process) SendCommand(command string) error {
 	return err
 }
 
+// ConsoleLogName is where RealmRunner records everything the server process
+// prints. It is deliberately NOT logs/latest.log: the Minecraft server writes
+// that file itself through log4j, and a second writer appending to it
+// interleaves half-lines into the operator's log.
+const ConsoleLogName = "console.log"
+
+// maxLogLine is the largest single line the capture will keep. The default
+// bufio limit is 64KB, and a line longer than the limit stops the scanner
+// silently, which would end log capture for the rest of the server's life.
+const maxLogLine = 1024 * 1024
+
 func (p *Process) captureOutput(serverDir string) {
-	// Ensure logs directory exists
 	logsDir := filepath.Join(serverDir, "logs")
 	os.MkdirAll(logsDir, 0755)
 
-	// Open log file
-	logPath := filepath.Join(logsDir, "latest.log")
+	logPath := filepath.Join(logsDir, ConsoleLogName)
+	rotateConsoleLog(logPath)
+
 	logFile, err := os.OpenFile(logPath, os.O_CREATE|os.O_WRONLY|os.O_APPEND, 0644)
 	if err != nil {
+		log.Printf("Cannot open console log %s: %v", logPath, err)
 		return
 	}
 	defer logFile.Close()
 
-	// Merge stdout and stderr
-	merged := io.MultiReader(p.stdout, p.stderr)
-	scanner := bufio.NewScanner(merged)
+	// stdout and stderr are read concurrently. Reading them in sequence would
+	// hold back everything on stderr - JVM errors and stack traces - until the
+	// process exited.
+	var mu sync.Mutex
+	var wg sync.WaitGroup
 
-	for scanner.Scan() {
-		line := scanner.Text()
-		logFile.WriteString(line + "\n")
+	copyStream := func(stream io.Reader) {
+		defer wg.Done()
+
+		scanner := bufio.NewScanner(stream)
+		scanner.Buffer(make([]byte, 0, 64*1024), maxLogLine)
+
+		for scanner.Scan() {
+			line := scanner.Text()
+			mu.Lock()
+			logFile.WriteString(line + "\n")
+			mu.Unlock()
+		}
 	}
+
+	wg.Add(2)
+	go copyStream(p.stdout)
+	go copyStream(p.stderr)
+	wg.Wait()
+}
+
+// rotateConsoleLog keeps the previous run's console output as console.log.1 so
+// a crash can still be investigated after a restart.
+func rotateConsoleLog(logPath string) {
+	info, err := os.Stat(logPath)
+	if err != nil || info.Size() == 0 {
+		return
+	}
+	os.Rename(logPath, logPath+".1")
+}
+
+// consoleLogPath is the file to read a server's output from. Servers created
+// before RealmRunner kept its own console log only have the Minecraft log.
+func consoleLogPath(serverDir string) string {
+	console := filepath.Join(serverDir, "logs", ConsoleLogName)
+	if info, err := os.Stat(console); err == nil && info.Size() > 0 {
+		return console
+	}
+	return filepath.Join(serverDir, "logs", "latest.log")
 }
 
 func (p *Process) TailLogs(serverDir string) (<-chan string, error) {
-	logPath := filepath.Join(serverDir, "logs", "latest.log")
+	logPath := consoleLogPath(serverDir)
 
 	ch := make(chan string, 100)
 
@@ -214,6 +271,19 @@ func (p *Process) TailLogs(serverDir string) (<-chan string, error) {
 	return ch, nil
 }
 
+// StopRequested reports whether this process was asked to shut down, as opposed
+// to exiting on its own.
+func (p *Process) StopRequested() bool {
+	p.mu.Lock()
+	defer p.mu.Unlock()
+	return p.stopRequested
+}
+
+// Uptime is how long the process has been running.
+func (p *Process) Uptime() time.Duration {
+	return time.Since(p.startedAt)
+}
+
 // PID returns the process ID, or 0 if not running
 func (p *Process) PID() int {
 	if p.cmd != nil && p.cmd.Process != nil {
@@ -225,7 +295,7 @@ func (p *Process) PID() int {
 // ReadHistoricalLogs reads logs from the log file (for stopped servers)
 // Returns up to the last 10,000 lines to avoid overwhelming the browser
 func ReadHistoricalLogs(serverDir string) ([]string, error) {
-	logPath := filepath.Join(serverDir, "logs", "latest.log")
+	logPath := consoleLogPath(serverDir)
 
 	// Check if log file exists
 	if _, err := os.Stat(logPath); os.IsNotExist(err) {
@@ -240,6 +310,7 @@ func ReadHistoricalLogs(serverDir string) ([]string, error) {
 
 	var lines []string
 	scanner := bufio.NewScanner(file)
+	scanner.Buffer(make([]byte, 0, 64*1024), maxLogLine)
 	for scanner.Scan() {
 		lines = append(lines, scanner.Text())
 

@@ -14,26 +14,40 @@ import (
 	"github.com/wzin/realmrunner/config"
 	"github.com/wzin/realmrunner/metrics"
 	"github.com/wzin/realmrunner/minecraft"
+	"github.com/wzin/realmrunner/sleepproxy"
 )
 
 type Manager struct {
-	db        *sql.DB
-	config    *config.Config
-	processes map[string]*Process
-	collector *metrics.Collector
-	registry  *minecraft.Registry
-	cgroupMgr *cgroup.Manager
-	mu        sync.RWMutex
+	db               *sql.DB
+	config           *config.Config
+	processes        map[string]*Process
+	collector        *metrics.Collector
+	registry         *minecraft.Registry
+	cgroupMgr        *cgroup.Manager
+	restarts         *restartTracker
+	exitDescriptions *exitDescriptions
+	mu               sync.RWMutex
+
+	// Auto-sleep: one proxy per server holding its public port, plus how long
+	// each server has been empty.
+	proxies     map[string]*sleepproxy.Proxy
+	sleepStates map[string]*sleepState
+	sleepMu     sync.Mutex
 }
 
 func NewManager(db *sql.DB, cfg *config.Config, collector *metrics.Collector, registry *minecraft.Registry, cgroupMgr *cgroup.Manager) *Manager {
 	m := &Manager{
-		db:        db,
-		config:    cfg,
-		processes: make(map[string]*Process),
-		collector: collector,
-		registry:  registry,
-		cgroupMgr: cgroupMgr,
+		db:               db,
+		config:           cfg,
+		processes:        make(map[string]*Process),
+		collector:        collector,
+		registry:         registry,
+		cgroupMgr:        cgroupMgr,
+		restarts:         newRestartTracker(),
+		exitDescriptions: newExitDescriptions(),
+
+		proxies:     make(map[string]*sleepproxy.Proxy),
+		sleepStates: make(map[string]*sleepState),
 	}
 
 	// Clean up orphaned server statuses on startup
@@ -110,15 +124,21 @@ func (m *Manager) CreateServer(name, version, flavor string, port int) (*Server,
 		return nil, fmt.Errorf("port %d is already in use", port)
 	}
 
-	// Create server record
+	// Create server record. The control port and password are provisioned on
+	// first start, but the defaults have to be set here: the insert would
+	// otherwise override the column defaults with zero values.
 	server := &Server{
-		ID:        uuid.New().String(),
-		Name:      name,
-		Version:   version,
-		Flavor:    flavor,
-		Port:      port,
-		Status:    StatusStopped,
-		CreatedAt: time.Now(),
+		ID:             uuid.New().String(),
+		Name:           name,
+		Version:        version,
+		Flavor:         flavor,
+		Port:           port,
+		Status:         StatusStopped,
+		CreatedAt:      time.Now(),
+		InternalPort:   DerivedInternalPort(port),
+		RCONPort:       DerivedRCONPort(port),
+		IdleTimeoutMin: defaultIdleTimeoutMin,
+		AutoRestart:    true,
 	}
 
 	if err := CreateServer(m.db, server); err != nil {
@@ -168,26 +188,41 @@ func (m *Manager) StartServer(id string) error {
 	}
 
 	// Get start command from provider
+	// Refuse to start rather than let the JVM exit a second later with an error
+	// nobody sees.
+	if err := preflightJava(server.Version); err != nil {
+		UpdateServerStatus(m.db, id, m.restingStatus(id))
+		RecordExit(m.db, id, 0, err.Error())
+		return err
+	}
+
+	// Provision the RCON control channel and write server.properties.
+	listenPort, err := m.ensureControlConfig(server)
+	if err != nil {
+		UpdateServerStatus(m.db, id, m.restingStatus(id))
+		return err
+	}
+
 	serverDir := m.getServerDir(id)
+	heapMB := m.heapFor(server)
 	// Minecraft versions require different Java runtimes (26.x needs Java 25),
 	// so resolve the interpreter from the server's version.
 	cmd := minecraft.JavaCommandForVersion(server.Version)
-	args := []string{
-		fmt.Sprintf("-Xmx%dM", m.config.MemoryMB),
-		fmt.Sprintf("-Xms%dM", m.config.MemoryMB),
-		"-jar", "server.jar", "nogui",
-	}
+	args := append([]string{
+		fmt.Sprintf("-Xmx%dM", heapMB),
+		fmt.Sprintf("-Xms%dM", heapMB),
+	}, "-jar", "server.jar", "nogui")
 	if m.registry != nil {
 		if provider, ok := m.registry.GetProvider(server.Flavor); ok {
-			cmd, args = provider.StartCommand(serverDir, m.config.MemoryMB, server.Version)
+			cmd, args = provider.StartCommand(serverDir, heapMB, server.Version)
 		}
 	}
 	log.Printf("Starting server %s (%s %s) with %s", id, server.Flavor, server.Version, cmd)
 
 	// Start process
-	process, err := StartProcess(serverDir, server.Port, cmd, args)
+	process, err := StartProcess(serverDir, listenPort, cmd, args)
 	if err != nil {
-		UpdateServerStatus(m.db, id, StatusStopped)
+		UpdateServerStatus(m.db, id, m.restingStatus(id))
 		return fmt.Errorf("failed to start server: %w", err)
 	}
 
@@ -202,6 +237,7 @@ func (m *Manager) StartServer(id string) error {
 	// Update status to running
 	UpdateServerStatus(m.db, id, StatusRunning)
 	UpdateServerLastStarted(m.db, id, time.Now())
+	ClearLastError(m.db, id)
 
 	// Apply cgroup limits if configured
 	if m.cgroupMgr != nil && (server.CPULimit > 0 || server.MemoryLimitMB > 0) {
@@ -223,7 +259,10 @@ func (m *Manager) StartServer(id string) error {
 func (m *Manager) monitorProcess(id string, process *Process) {
 	// Wait for process to exit
 	if process.cmd != nil && process.cmd.Process != nil {
-		process.cmd.Wait()
+		waitErr := process.cmd.Wait()
+		exitCode := exitCodeOf(waitErr)
+		uptime := process.Uptime()
+		m.exitDescriptions.set(id, exitDescription(waitErr, exitCode))
 
 		// Stop metrics collection
 		if m.collector != nil {
@@ -240,8 +279,22 @@ func (m *Manager) monitorProcess(id string, process *Process) {
 		delete(m.processes, id)
 		m.mu.Unlock()
 
-		UpdateServerStatus(m.db, id, StatusStopped)
-		log.Printf("Server %s process exited, status set to stopped", id)
+		if process.StopRequested() {
+			// With auto-sleep the proxy keeps holding the port, so the server
+			// is asleep rather than stopped.
+			status := m.restingStatus(id)
+			UpdateServerStatus(m.db, id, status)
+			log.Printf("Server %s process exited, status set to %s", id, status)
+			m.restarts.reset(id)
+			return
+		}
+
+		// A server that stayed up for a while has earned a clean slate.
+		if uptime >= stableUptime {
+			m.restarts.reset(id)
+		}
+
+		m.handleCrash(id, exitCode)
 	}
 }
 
@@ -287,10 +340,21 @@ func (m *Manager) StopServer(id string) error {
 		m.mu.Unlock()
 	}
 
-	// Update status to stopped
-	UpdateServerStatus(m.db, id, StatusStopped)
+	// With auto-sleep the port stays held by the proxy, so the server is
+	// asleep rather than simply stopped.
+	UpdateServerStatus(m.db, id, m.restingStatus(id))
 
 	return nil
+}
+
+// restingStatus is the status a server takes when it is not running: asleep if
+// its port is still held for players, otherwise stopped.
+func (m *Manager) restingStatus(id string) string {
+	srv, err := GetServer(m.db, id)
+	if err == nil && srv.AutoSleep {
+		return StatusSleeping
+	}
+	return StatusStopped
 }
 
 func (m *Manager) ForceStopServer(id string) error {
@@ -322,7 +386,7 @@ func (m *Manager) ForceStopServer(id string) error {
 		m.mu.Unlock()
 	}
 
-	UpdateServerStatus(m.db, id, StatusStopped)
+	UpdateServerStatus(m.db, id, m.restingStatus(id))
 	return nil
 }
 
@@ -378,6 +442,12 @@ func (m *Manager) WipeoutServer(id string) error {
 }
 
 func (m *Manager) SendCommand(id, command string) error {
+	// RCON is the reliable path: it confirms delivery and works even for a
+	// server this process did not start.
+	if _, err := m.RCONExecute(id, command); err == nil {
+		return nil
+	}
+
 	m.mu.RLock()
 	process, exists := m.processes[id]
 	m.mu.RUnlock()
@@ -409,10 +479,37 @@ func (m *Manager) SetLimits(id string, cpuLimit float64, memoryLimitMB int) erro
 	if err != nil {
 		return err
 	}
-	if srv.Status != StatusStopped {
+	if srv.Status != StatusStopped && srv.Status != StatusSleeping && srv.Status != StatusCrashed {
 		return fmt.Errorf("server must be stopped to change limits")
 	}
 	return UpdateServerLimits(m.db, id, cpuLimit, memoryLimitMB)
+}
+
+// heapFor is the Java heap a server should run with: its own setting, or the
+// instance-wide default when it has none.
+func (m *Manager) heapFor(srv *Server) int {
+	if srv.HeapMB > 0 {
+		return srv.HeapMB
+	}
+	return m.config.MemoryMB
+}
+
+// SetHeapMB changes one server's Java heap. It takes effect on the next start.
+func (m *Manager) SetHeapMB(id string, heapMB int) error {
+	srv, err := GetServer(m.db, id)
+	if err != nil {
+		return err
+	}
+	if heapMB < 0 {
+		return fmt.Errorf("heap size cannot be negative")
+	}
+	if heapMB > 0 && heapMB < 512 {
+		return fmt.Errorf("a Minecraft server needs at least 512 MB of heap")
+	}
+	if srv.MemoryLimitMB > 0 && heapMB > srv.MemoryLimitMB {
+		return fmt.Errorf("the heap (%d MB) cannot be larger than the server's memory limit (%d MB)", heapMB, srv.MemoryLimitMB)
+	}
+	return SetHeapMB(m.db, id, heapMB)
 }
 
 func (m *Manager) SetRestartSchedule(id, schedule string) error {
@@ -421,41 +518,6 @@ func (m *Manager) SetRestartSchedule(id, schedule string) error {
 
 func (m *Manager) GetRegistry() *minecraft.Registry {
 	return m.registry
-}
-
-func (m *Manager) UpgradeServer(id, version, flavor string) error {
-	srv, err := GetServer(m.db, id)
-	if err != nil {
-		return err
-	}
-
-	if srv.Status != StatusStopped {
-		return fmt.Errorf("server must be stopped to upgrade")
-	}
-
-	if flavor == "" {
-		flavor = srv.Flavor
-	}
-
-	// Download new server jar
-	provider, ok := m.registry.GetProvider(flavor)
-	if !ok {
-		return fmt.Errorf("unknown server flavor: %s", flavor)
-	}
-
-	serverDir := m.getServerDir(id)
-
-	// Remove old server.jar
-	jarPath := filepath.Join(serverDir, "server.jar")
-	os.Remove(jarPath)
-
-	// Download new version
-	if err := provider.DownloadServer(serverDir, version); err != nil {
-		return fmt.Errorf("failed to download server: %w", err)
-	}
-
-	// Update DB
-	return UpdateServerVersion(m.db, id, version, flavor)
 }
 
 func (m *Manager) GetCollector() *metrics.Collector {

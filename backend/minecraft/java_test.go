@@ -3,6 +3,7 @@ package minecraft
 import (
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 )
 
@@ -82,7 +83,9 @@ func TestJavaCommand(t *testing.T) {
 		{"exact match 21", 21, java21},
 		{"older requirement uses oldest compatible runtime", 17, java21},
 		{"java 8 requirement falls forward to 21", 8, java21},
-		{"newer than anything installed falls back to PATH", 99, "java"},
+		// Nothing installed is new enough: return the newest runtime there is.
+		// The caller checks ResolveJava's satisfied flag and refuses to start.
+		{"newer than anything installed uses the newest runtime", 99, java25},
 	}
 
 	for _, tt := range tests {
@@ -137,13 +140,79 @@ func TestJavaCommandNoInstallations(t *testing.T) {
 
 func TestJavaArgs(t *testing.T) {
 	args := javaArgs(2048)
-	want := []string{"-Xmx2048M", "-Xms2048M", "-jar", "server.jar", "nogui"}
-	if len(args) != len(want) {
-		t.Fatalf("javaArgs returned %v, want %v", args, want)
+
+	if args[0] != "-Xmx2048M" || args[1] != "-Xms2048M" {
+		t.Errorf("heap arguments = %v", args[:2])
 	}
-	for i := range want {
-		if args[i] != want[i] {
-			t.Errorf("javaArgs()[%d] = %q, want %q", i, args[i], want[i])
+	// The jar must stay last, after the tuning flags.
+	tail := args[len(args)-3:]
+	if tail[0] != "-jar" || tail[1] != "server.jar" || tail[2] != "nogui" {
+		t.Errorf("arguments end with %v, want -jar server.jar nogui", tail)
+	}
+
+	joined := strings.Join(args, " ")
+	for _, flag := range []string{"-XX:+UseG1GC", "-XX:MaxGCPauseMillis=200", "-XX:+AlwaysPreTouch"} {
+		if !strings.Contains(joined, flag) {
+			t.Errorf("tuning flag %s is missing from %v", flag, args)
 		}
+	}
+}
+
+// The new-generation sizing differs for large heaps.
+func TestGCFlagsScaleWithHeap(t *testing.T) {
+	small := strings.Join(GCFlags(2048), " ")
+	large := strings.Join(GCFlags(16*1024), " ")
+
+	if !strings.Contains(small, "-XX:G1NewSizePercent=30") || !strings.Contains(small, "-XX:G1HeapRegionSize=8M") {
+		t.Errorf("small-heap flags = %s", small)
+	}
+	if !strings.Contains(large, "-XX:G1NewSizePercent=40") || !strings.Contains(large, "-XX:G1HeapRegionSize=16M") {
+		t.Errorf("large-heap flags = %s", large)
+	}
+
+	// Both must pin the pause target, which is the point of the exercise.
+	for _, flags := range []string{small, large} {
+		if !strings.Contains(flags, "-XX:MaxGCPauseMillis=200") {
+			t.Errorf("pause target missing from %s", flags)
+		}
+	}
+}
+
+func TestResolveJavaReportsUnsatisfiableRequirements(t *testing.T) {
+	root := t.TempDir()
+	java21 := fakeJavaHome(t, root, "21")
+
+	original := javaSearchDirs
+	javaSearchDirs = []string{root}
+	t.Cleanup(func() { javaSearchDirs = original })
+
+	path, major, satisfied := ResolveJava(21)
+	if path != java21 || major != 21 || !satisfied {
+		t.Errorf("ResolveJava(21) = %q, %d, %v; want %q, 21, true", path, major, satisfied, java21)
+	}
+
+	// Minecraft 26.x on a Java 21-only image: this is the failure that used to
+	// show up only as an instant, unexplained shutdown.
+	path, major, satisfied = ResolveJava(25)
+	if satisfied {
+		t.Error("ResolveJava(25) reported satisfied with only Java 21 installed")
+	}
+	if path != java21 || major != 21 {
+		t.Errorf("ResolveJava(25) = %q, %d; want the newest installed runtime %q, 21", path, major, java21)
+	}
+}
+
+func TestInstalledJavaMajors(t *testing.T) {
+	root := t.TempDir()
+	fakeJavaHome(t, root, "21")
+	fakeJavaHome(t, root, "25")
+
+	original := javaSearchDirs
+	javaSearchDirs = []string{root}
+	t.Cleanup(func() { javaSearchDirs = original })
+
+	majors := InstalledJavaMajors()
+	if len(majors) != 2 || majors[0] != 21 || majors[1] != 25 {
+		t.Errorf("InstalledJavaMajors() = %v, want [21 25]", majors)
 	}
 }

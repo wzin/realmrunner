@@ -41,11 +41,11 @@ func QueryServerStatus(port int) (*ServerPing, error) {
 
 	// Send Handshake packet
 	handshake := &bytes.Buffer{}
-	writeVarInt(handshake, 0x00)       // Packet ID
-	writeVarInt(handshake, -1)         // Protocol version (-1 for status)
-	writeString(handshake, "127.0.0.1") // Server address
+	writeVarInt(handshake, 0x00)                            // Packet ID
+	writeVarInt(handshake, -1)                              // Protocol version (-1 for status)
+	writeString(handshake, "127.0.0.1")                     // Server address
 	binary.Write(handshake, binary.BigEndian, uint16(port)) // Port
-	writeVarInt(handshake, 1)          // Next state: Status
+	writeVarInt(handshake, 1)                               // Next state: Status
 
 	// Write handshake with length prefix
 	writePacket(conn, handshake.Bytes())

@@ -95,6 +95,24 @@ export const api = {
   addOp: (id, name) => request(`/servers/${id}/ops`, { method: 'POST', body: JSON.stringify({ name }) }),
   removeOp: (id, uuid) => request(`/servers/${id}/ops/${uuid}`, { method: 'DELETE' }),
 
+  // Live players (over RCON)
+  getPlayers: (id) => request(`/servers/${id}/players`),
+  kickPlayer: (id, player, reason) => request(`/servers/${id}/players/kick`, { method: 'POST', body: JSON.stringify({ player, reason }) }),
+  banPlayer: (id, player, reason) => request(`/servers/${id}/players/ban`, { method: 'POST', body: JSON.stringify({ player, reason }) }),
+  pardonPlayer: (id, player) => request(`/servers/${id}/players/pardon`, { method: 'POST', body: JSON.stringify({ player }) }),
+  opPlayer: (id, player) => request(`/servers/${id}/players/op`, { method: 'POST', body: JSON.stringify({ player }) }),
+  deopPlayer: (id, player) => request(`/servers/${id}/players/deop`, { method: 'POST', body: JSON.stringify({ player }) }),
+
+  // Auto-sleep and crash handling
+  setAutoSleep: (id, enabled, idleTimeoutMin) => request(`/servers/${id}/autosleep`, { method: 'PUT', body: JSON.stringify({ enabled, idle_timeout_min: idleTimeoutMin }) }),
+  setAutoRestart: (id, enabled) => request(`/servers/${id}/autorestart`, { method: 'PUT', body: JSON.stringify({ enabled }) }),
+  wakeServer: (id) => request(`/servers/${id}/wake`, { method: 'POST' }),
+  sleepServer: (id) => request(`/servers/${id}/sleep`, { method: 'POST' }),
+
+  // Connection diagnostics and heap size
+  getDiagnostics: (id) => request(`/servers/${id}/diagnostics`),
+  setHeap: (id, heapMB) => request(`/servers/${id}/heap`, { method: 'PUT', body: JSON.stringify({ heap_mb: heapMB }) }),
+
   // Files
   getFiles: (id) => request(`/servers/${id}/files`),
   getFile: (id, path) => request(`/servers/${id}/file/${path}`),
