@@ -501,11 +501,21 @@ caller sees the error instead of HTML with a 200.
 
 ## Build Identity
 
-`version.Version` and `version.Commit` are set by the Docker build through
-`-ldflags` (`VERSION` and `COMMIT` build args, which CI fills from the git tag
-and SHA); a local build reports `dev`. `GET /api/version` needs no
-authentication, and both the dashboard header and the login page show it, so a
-deployment can be confirmed at a glance.
+`version.Version` and `version.Commit` are stamped into the binary with
+`-ldflags`. The value comes from the `VERSION` build argument when there is one,
+and otherwise from the **`VERSION` file at the repository root**.
+
+The file is what matters in production: Komodo builds the stack from
+`compose.yaml`, and a compose build passes no build arguments, so without it
+every deployed build reports `dev` no matter which tag was pushed. CI still
+passes the git tag, which takes precedence.
+
+Cut releases with `scripts/release.sh v2.4.0 --push`: it updates the VERSION
+file, commits it, tags it and pushes, keeping the file and the tag in step. A
+tag on its own would deploy carrying the previous version string.
+
+`GET /api/version` needs no authentication, and both the dashboard header and
+the login page show it, so a deployment can be confirmed at a glance.
 
 ## Deployment
 
@@ -537,11 +547,21 @@ caller sees the error instead of HTML with a 200.
 
 ## Build Identity
 
-`version.Version` and `version.Commit` are set by the Docker build through
-`-ldflags` (`VERSION` and `COMMIT` build args, which CI fills from the git tag
-and SHA); a local build reports `dev`. `GET /api/version` needs no
-authentication, and both the dashboard header and the login page show it, so a
-deployment can be confirmed at a glance.
+`version.Version` and `version.Commit` are stamped into the binary with
+`-ldflags`. The value comes from the `VERSION` build argument when there is one,
+and otherwise from the **`VERSION` file at the repository root**.
+
+The file is what matters in production: Komodo builds the stack from
+`compose.yaml`, and a compose build passes no build arguments, so without it
+every deployed build reports `dev` no matter which tag was pushed. CI still
+passes the git tag, which takes precedence.
+
+Cut releases with `scripts/release.sh v2.4.0 --push`: it updates the VERSION
+file, commits it, tags it and pushes, keeping the file and the tag in step. A
+tag on its own would deploy carrying the previous version string.
+
+`GET /api/version` needs no authentication, and both the dashboard header and
+the login page show it, so a deployment can be confirmed at a glance.
 
 ## Deployment Checklist
 
@@ -615,6 +635,8 @@ deployment can be confirmed at a glance.
   with container headroom enforcement (2026-09-18)
 - **v2.3.0**: Correct cache headers for the app shell and hashed assets, fixing blank pages after a
   deployment; version shown in the dashboard and on the login page (2026-09-18)
+- **v2.4.0**: VERSION file so compose (Komodo) builds stamp the real version instead of "dev",
+  plus scripts/release.sh (2026-09-18)
 
 ---
 

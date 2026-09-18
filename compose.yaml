@@ -3,6 +3,10 @@ services:
     build:
       context: .
       network: host
+      args:
+        # Empty falls back to the VERSION file in the repository.
+        VERSION: "${REALMRUNNER_VERSION:-}"
+        COMMIT: "${REALMRUNNER_COMMIT:-}"
     container_name: realmrunner
     restart: unless-stopped
     ports:
