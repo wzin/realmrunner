@@ -405,7 +405,7 @@ func TestFileEditorSecurity(t *testing.T) {
 
 	// Read the file
 	w = httptest.NewRecorder()
-	router.ServeHTTP(w, authReq("GET", "/api/servers/"+id+"/files/server.properties", token, nil))
+	router.ServeHTTP(w, authReq("GET", "/api/servers/"+id+"/file/server.properties", token, nil))
 	if w.Code != http.StatusOK {
 		t.Fatalf("Read file failed: %d %s", w.Code, w.Body.String())
 	}
@@ -413,21 +413,21 @@ func TestFileEditorSecurity(t *testing.T) {
 	// Write the file
 	writeReq := map[string]interface{}{"content": "level-name=newworld\n"}
 	w = httptest.NewRecorder()
-	router.ServeHTTP(w, authReq("PUT", "/api/servers/"+id+"/files/server.properties", token, writeReq))
+	router.ServeHTTP(w, authReq("PUT", "/api/servers/"+id+"/file/server.properties", token, writeReq))
 	if w.Code != http.StatusOK {
 		t.Errorf("Write file failed: %d %s", w.Code, w.Body.String())
 	}
 
 	// Try path traversal
 	w = httptest.NewRecorder()
-	router.ServeHTTP(w, authReq("GET", "/api/servers/"+id+"/files/../../etc/passwd", token, nil))
+	router.ServeHTTP(w, authReq("GET", "/api/servers/"+id+"/file/../../etc/passwd", token, nil))
 	if w.Code == http.StatusOK {
 		t.Error("Path traversal should be blocked")
 	}
 
 	// Try to read .jar
 	w = httptest.NewRecorder()
-	router.ServeHTTP(w, authReq("GET", "/api/servers/"+id+"/files/server.jar", token, nil))
+	router.ServeHTTP(w, authReq("GET", "/api/servers/"+id+"/file/server.jar", token, nil))
 	if w.Code == http.StatusOK {
 		t.Error("Reading .jar should be blocked")
 	}
