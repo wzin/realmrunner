@@ -207,5 +207,14 @@ func GCFlags(memoryMB int) []string {
 		"-XX:SurvivorRatio=32",
 		"-XX:+PerfDisableSharedMem",
 		"-XX:MaxTenuringThreshold=1",
+
+		// Record what the heap and the pauses actually look like. Resident
+		// memory says nothing about heap pressure, because the heap is
+		// committed up front; the size after a collection is the live set.
+		"-Xlog:gc:file=" + GCLogName + "::filecount=3,filesize=8M",
 	}
 }
+
+// GCLogName is where the JVM records collections, relative to the server
+// directory.
+const GCLogName = "logs/gc.log"

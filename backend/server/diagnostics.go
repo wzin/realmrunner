@@ -15,6 +15,7 @@ type Diagnostics struct {
 	LagWarnings      int                 `json:"lag_warnings"`
 	WorstLagMs       int                 `json:"worst_lag_ms"`
 	Restarts         int                 `json:"restarts"`
+	Memory           *MemoryReport       `json:"memory,omitempty"`
 	Notes            []string            `json:"notes"`
 }
 
@@ -213,11 +214,23 @@ func itoa(value int) string {
 	return digits
 }
 
-// Diagnose reads a server's log and analyses it.
+// Diagnose reads a server's log and analyses it, including heap pressure when
+// a GC log is available.
 func (m *Manager) Diagnose(id string) (*Diagnostics, error) {
 	lines, err := ReadHistoricalLogs(m.getServerDir(id))
 	if err != nil {
 		return nil, err
 	}
-	return AnalyseLogs(lines), nil
+
+	diag := AnalyseLogs(lines)
+
+	// A server started before GC logging existed simply has no report.
+	if memory, err := m.MemoryReport(id); err == nil {
+		diag.Memory = memory
+		if memory.Recommendation != "" {
+			diag.Notes = append(diag.Notes, memory.Verdict+" "+memory.Recommendation)
+		}
+	}
+
+	return diag, nil
 }
