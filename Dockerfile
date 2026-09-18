@@ -19,11 +19,17 @@ COPY backend/go.mod ./
 COPY backend/ ./
 RUN go mod download && go mod tidy
 
-# Stamped by CI from the git tag; a plain build reports "dev".
-ARG VERSION=dev
+# The version comes from the build argument when there is one (CI passes the git
+# tag), and otherwise from the VERSION file in the repository. The file matters
+# because the production stack is built by Komodo from compose.yaml, which
+# passes no build arguments - without it every deployed build reports "dev".
+COPY VERSION /app/VERSION
+ARG VERSION=""
 ARG COMMIT=""
-RUN CGO_ENABLED=1 GOOS=linux go build \
-    -ldflags "-X github.com/wzin/realmrunner/version.Version=${VERSION} -X github.com/wzin/realmrunner/version.Commit=${COMMIT}" \
+RUN BUILD_VERSION="${VERSION:-$(cat /app/VERSION)}" && \
+    echo "Building RealmRunner ${BUILD_VERSION}" && \
+    CGO_ENABLED=1 GOOS=linux go build \
+    -ldflags "-X github.com/wzin/realmrunner/version.Version=${BUILD_VERSION} -X github.com/wzin/realmrunner/version.Commit=${COMMIT}" \
     -o realmrunner .
 
 # Stage 3: Runtime
