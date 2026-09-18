@@ -63,7 +63,8 @@
         </template>
 
         <h4 v-if="diag.disconnects && diag.disconnects.length" class="section-title">Why players dropped</h4>
-        <table v-if="diag.disconnects && diag.disconnects.length" class="table">
+        <div v-if="diag.disconnects && diag.disconnects.length" class="table-scroll">
+        <table class="table">
           <tbody>
             <tr v-for="d in diag.disconnects" :key="d.reason">
               <td class="count-cell">{{ d.count }}&times;</td>
@@ -74,9 +75,11 @@
             </tr>
           </tbody>
         </table>
+        </div>
 
         <h4 v-if="diag.players && diag.players.length" class="section-title">Per player</h4>
-        <table v-if="diag.players && diag.players.length" class="table">
+        <div v-if="diag.players && diag.players.length" class="table-scroll">
+        <table class="table">
           <thead>
             <tr><th>Player</th><th>Drops</th><th>Logins</th><th>Address</th></tr>
           </thead>
@@ -89,6 +92,7 @@
             </tr>
           </tbody>
         </table>
+        </div>
 
         <p v-if="!totalDisconnects" class="muted">No disconnects found in the current log.</p>
       </template>
@@ -136,6 +140,7 @@ onMounted(load)
 .muted { color: var(--text-muted); font-size: 0.875rem; }
 .modal-wide { max-width: 44rem; }
 .summary-row { display: flex; gap: 1.5rem; flex-wrap: wrap; margin-bottom: 1rem; }
+.table { min-width: 22rem; }
 .summary { display: flex; flex-direction: column; }
 .summary-value { font-size: 1.5rem; font-weight: 700; }
 .summary-label { font-size: 0.75rem; color: var(--text-muted); }

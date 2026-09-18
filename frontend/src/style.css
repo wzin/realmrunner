@@ -381,3 +381,88 @@ input, select {
   border-color: var(--alert-success-border);
   color: var(--alert-success-text);
 }
+
+/* ========================================
+   Small screens
+
+   Scoped component styles compile to a higher specificity than these rules, so
+   the layout overrides below are marked important on purpose: they exist to
+   collapse desktop sizing that would otherwise push the page wider than the
+   screen.
+   ======================================== */
+
+/* Nothing may draw outside the viewport. */
+img,
+svg,
+canvas,
+video {
+  max-width: 100%;
+  height: auto;
+}
+
+/* Long words - server ids, addresses, log lines - wrap instead of stretching
+   their container. */
+.log-line,
+.log-message,
+code,
+pre {
+  overflow-wrap: anywhere;
+}
+
+/* Tables stay readable by scrolling themselves rather than the page. */
+.table-scroll {
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+}
+
+@media (max-width: 768px) {
+  .container {
+    padding: 1rem;
+  }
+
+  /* Full-screen sheets: a centred box with side margins wastes the little
+     space a phone has, and its inner content then scrolls awkwardly. */
+  .modal-overlay {
+    align-items: stretch;
+    justify-content: stretch;
+  }
+
+  .modal {
+    width: 100% !important;
+    max-width: none !important;
+    height: 100dvh;
+    max-height: none !important;
+    border-radius: 0;
+    border-left: 0;
+    border-right: 0;
+    padding: 1rem 1rem 2rem !important;
+    overflow-y: auto;
+  }
+
+  /* Comfortable tap targets. */
+  .btn {
+    min-height: 2.5rem;
+  }
+
+  .btn-sm {
+    min-height: 2.25rem;
+  }
+
+  /* Form controls at 16px so mobile browsers do not zoom in on focus. */
+  .input,
+  select,
+  textarea {
+    font-size: 16px;
+  }
+}
+
+@media (max-width: 480px) {
+  .container {
+    padding: 0.75rem;
+  }
+
+  /* The pixel font is wide; a long realm name would otherwise overflow. */
+  .pixel-font {
+    overflow-wrap: anywhere;
+  }
+}
