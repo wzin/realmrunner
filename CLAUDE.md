@@ -77,6 +77,7 @@ This document provides context for AI assistants (like Claude) working on the Re
 │   │   ├── crash.go            # Crash detection, backoff restarts, preflight
 │   │   ├── sleep.go            # Auto-sleep proxies and idle watcher
 │   │   ├── diagnostics.go      # Disconnect/lag analysis from server logs
+│   │   ├── memory.go           # Heap pressure from the GC log
 │   │   ├── upgrade.go          # Backed-up, verified, reversible upgrades
 │   │   ├── properties.go       # server.properties editing
 │   │   └── db.go               # SQLite operations
@@ -162,7 +163,7 @@ This document provides context for AI assistants (like Claude) working on the Re
   - Body: `{enabled: bool}`
 
 ### Players (RCON)
-- `GET /api/servers/:id/diagnostics` - Connection health read from the log
+- `GET /api/servers/:id/diagnostics` - Connection health and heap pressure, read from the logs
 - `PUT /api/servers/:id/heap` - Set the Java heap
   - Body: `{heap_mb: number}`
 - `GET /api/servers/:id/players` - Who is online
@@ -226,6 +227,29 @@ sizes and region size scaling at a 12 GB heap. Default GC settings give
 multi-second stop-the-world pauses on a populated server, which appear as
 "Can't keep up!" in the log and as players timing out, because the server misses
 keep-alives while it is paused.
+
+### Judging Memory Pressure
+
+Resident memory does not answer "does this server need more RAM": RealmRunner
+starts the JVM with `-Xms` equal to `-Xmx`, so the heap is committed at startup
+and the process shows the same size whether it is busy or idle. A 2 GB heap
+looks like roughly 2.7 GB resident from the first minute.
+
+Every server therefore writes `logs/gc.log` (`-Xlog:gc`, 3 files of 8 MB), and
+`ReadMemoryReport` parses it:
+
+- **Live set**: heap occupancy right after a collection - what the world needs
+- **Peak used**: occupancy before a collection
+- **Full GCs** and the **longest pause**: a server short of heap collects
+  constantly and stops the world while it does
+
+Over ~85% live, or any full GC, means it is short of heap; the report suggests
+roughly double the live set, rounded to a whole gigabyte.
+
+`RequiredContainerMB` is the memory a container needs for a heap: heap × 4/3 +
+256 MB, since metaspace, GC structures, thread stacks, the code cache and direct
+buffers sit outside the heap. A container limit set to the heap size gets the
+JVM killed by the kernel rather than reporting an out-of-memory error.
 
 ### Java Runtime Selection
 

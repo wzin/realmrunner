@@ -31,6 +31,37 @@
           <li v-for="(note, i) in diag.notes" :key="i">{{ note }}</li>
         </ul>
 
+        <template v-if="diag.memory">
+          <h4 class="section-title">Memory</h4>
+          <div class="summary-row">
+            <div class="summary">
+              <span class="summary-value">{{ diag.memory.live_set_mb }} MB</span>
+              <span class="summary-label">needed after a collection</span>
+            </div>
+            <div class="summary">
+              <span class="summary-value">{{ diag.memory.heap_mb }} MB</span>
+              <span class="summary-label">heap given</span>
+            </div>
+            <div class="summary">
+              <span class="summary-value">{{ diag.memory.used_percent }}%</span>
+              <span class="summary-label">of heap in use</span>
+            </div>
+            <div class="summary">
+              <span class="summary-value">{{ diag.memory.longest_pause_ms }}ms</span>
+              <span class="summary-label">longest GC pause</span>
+            </div>
+          </div>
+          <p class="verdict">
+            {{ diag.memory.verdict }}
+            <strong v-if="diag.memory.recommendation"> {{ diag.memory.recommendation }}</strong>
+          </p>
+          <p class="meaning">
+            Resident memory is not a useful signal here: the heap is committed when the server
+            starts, so the process is the same size busy or idle. What counts is how much survives
+            a collection.
+          </p>
+        </template>
+
         <h4 v-if="diag.disconnects && diag.disconnects.length" class="section-title">Why players dropped</h4>
         <table v-if="diag.disconnects && diag.disconnects.length" class="table">
           <tbody>
@@ -118,5 +149,6 @@ onMounted(load)
 .reason { font-weight: 600; }
 .meaning { margin: 0.15rem 0 0; color: var(--text-muted); }
 .address { font-family: monospace; }
+.verdict { font-size: 0.8125rem; margin: 0.25rem 0; }
 .modal-actions { display: flex; gap: 1rem; justify-content: flex-end; margin-top: 1.5rem; }
 </style>

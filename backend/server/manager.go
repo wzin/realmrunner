@@ -485,6 +485,12 @@ func (m *Manager) SetLimits(id string, cpuLimit float64, memoryLimitMB int) erro
 	return UpdateServerLimits(m.db, id, cpuLimit, memoryLimitMB)
 }
 
+// RequiredContainerMB is the memory a container needs for a given heap: the
+// heap plus the JVM's own overhead.
+func RequiredContainerMB(heapMB int) int {
+	return heapMB*4/3 + 256
+}
+
 // heapFor is the Java heap a server should run with: its own setting, or the
 // instance-wide default when it has none.
 func (m *Manager) heapFor(srv *Server) int {
@@ -506,8 +512,16 @@ func (m *Manager) SetHeapMB(id string, heapMB int) error {
 	if heapMB > 0 && heapMB < 512 {
 		return fmt.Errorf("a Minecraft server needs at least 512 MB of heap")
 	}
-	if srv.MemoryLimitMB > 0 && heapMB > srv.MemoryLimitMB {
-		return fmt.Errorf("the heap (%d MB) cannot be larger than the server's memory limit (%d MB)", heapMB, srv.MemoryLimitMB)
+	if srv.MemoryLimitMB > 0 && heapMB > 0 {
+		// A JVM needs more than its heap: metaspace, GC structures, thread
+		// stacks, code cache and direct buffers add roughly a third on top. A
+		// limit set to the heap size gets the server killed by the kernel
+		// rather than reported as out of memory.
+		if required := RequiredContainerMB(heapMB); srv.MemoryLimitMB < required {
+			return fmt.Errorf(
+				"a %d MB heap needs about %d MB of memory limit (the JVM uses more than its heap); the limit is %d MB",
+				heapMB, required, srv.MemoryLimitMB)
+		}
 	}
 	return SetHeapMB(m.db, id, heapMB)
 }
